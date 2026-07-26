@@ -52,7 +52,40 @@
             position: relative;
         }
 
-        h1 { font-size: 1.6rem; text-align: center; margin-top: 0; color: var(--primary); }
+        /* Header met Titel en Home-knop */
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #F3F4F6;
+            padding-bottom: 10px;
+        }
+
+        .header-bar h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .btn-home {
+            background-color: #F3F4F6;
+            color: #4B5563;
+            border: 1px solid #D1D5DB;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-home:hover {
+            background-color: #E5E7EB;
+        }
         
         .step-panel { display: none; }
         .step-panel.active { display: block; }
@@ -243,6 +276,23 @@
             60% { transform: scale(1.2); opacity: 1; }
             100% { transform: scale(1); opacity: 0; }
         }
+
+        /* Eindscherm Styling */
+        .finish-card {
+            text-align: center;
+            padding: 20px 10px;
+        }
+
+        .finish-icon {
+            font-size: 4.5rem;
+            margin-bottom: 10px;
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.15); }
+        }
     </style>
 </head>
 <body>
@@ -250,7 +300,11 @@
 <div id="anim-container" class="anim-overlay"></div>
 
 <div class="container">
-    <h1>📖 Leestrainer</h1>
+    <!-- Header met Home-knop -->
+    <div class="header-bar">
+        <h1>📖 Leestrainer</h1>
+        <button class="btn-home" onclick="resetApp()" title="Opnieuw beginnen">🏠 Home</button>
+    </div>
 
     <!-- STAP 1: FOTO MAKEN & BIJSNIJDEN -->
     <div id="step-upload" class="step-panel active">
@@ -304,13 +358,26 @@
 
             <div class="nav-buttons">
                 <button class="btn btn-outline" style="margin:0;" onclick="prevWord()">⬅️ Vorige</button>
-                <button class="btn btn-outline" style="margin:0;" onclick="nextWord()">Volgende ➡️</button>
+                <button class="btn btn-outline" style="margin:0;" onclick="nextWord(false)">Volgende ➡️</button>
             </div>
         </div>
 
         <div id="feedback" class="feedback-box"></div>
-        
-        <button class="btn btn-secondary" style="margin-top:20px;" onclick="resetApp()">🔄 Nieuwe Foto / Rijtje</button>
+    </div>
+
+    <!-- STAP 4: EINDSCHERM (RIJTJE VOLTOOID) -->
+    <div id="step-finished" class="step-panel">
+        <div class="finish-card">
+            <div class="finish-icon">🏆🌟🎉</div>
+            <h2 style="color: var(--primary); margin-top: 0;">Super gedaan!</h2>
+            <p style="font-size: 1.15rem; line-height: 1.5; color: #374151;">
+                Je hebt <strong>alle woorden</strong> van dit rijtje helemaal zelf gelezen! 👏🎈
+            </p>
+            <div style="margin-top: 25px;">
+                <button class="btn" onclick="setMode(1); switchStep('step-practice');">🔄 Rijtje nog eens oefenen</button>
+                <button class="btn btn-secondary" onclick="resetApp()">📸 Nieuwe foto maken</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -321,7 +388,7 @@
     let currentMode = 1; // 1: VOOR, 2: KOOR, 3: DOOR
     let recognition = null;
     let isPlayingList = false;
-    let errorCount = 0; // Telt het aantal fouten op het huidige woord
+    let errorCount = 0;
 
     const cameraInput = document.getElementById('camera-input');
     const imageToCrop = document.getElementById('image-to-crop');
@@ -458,6 +525,7 @@
         else if (mode === 3) {
             fullListView.style.display = 'none';
             singleWordView.style.display = 'block';
+            currentIndex = 0;
             errorCount = 0;
             updateSingleWordUI();
         }
@@ -470,10 +538,8 @@
         }
 
         if (currentMode === 1) {
-            // VOOR: Zeer traag leestempo (0.55) voor maximale helderheid
             readFullListSequentially(0.55, 600);
         } else if (currentMode === 2) {
-            // KOOR: Aftellen en traag leestempo (0.60)
             const banner = document.getElementById('countdown-banner');
             let count = 3;
             banner.innerText = `⏳ Samen lezen in ${count}...`;
@@ -577,35 +643,37 @@
         }
     }
 
-    // Beoordeling met strengere match & 2x fout regel
+    // Beoordeling met automatisch doorgaan en eindscherm
     function evaluateSpeech(spoken) {
         const target = wordList[currentIndex].toLowerCase().trim();
         const spokenClean = spoken.toLowerCase().trim();
         
-        // STRENGERE MATCH: Exacte vergelijking
         if (spokenClean === target) {
             errorCount = 0;
             showFeedback(` Perfect gelezen! ("${spoken}")`, 'success');
             triggerRandomAnimation();
             
             setTimeout(() => {
-                if (currentMode === 3 && currentIndex < wordList.length - 1) {
-                    nextWord();
+                if (currentMode === 3) {
+                    if (currentIndex < wordList.length - 1) {
+                        nextWord(true); // Automatisch naar volgende én meteen luisteren!
+                    } else {
+                        showCompletionView(); // Laatste woord bereikt -> Toon Eindscherm!
+                    }
                 }
             }, 1800);
         } else {
             errorCount++;
             
             if (errorCount >= 2) {
-                // BIJ 2X FOUT: Lees het woord voor als hulp!
                 showFeedback(`💡 Luister goed naar de juiste uitspraak!`, 'error');
                 speakWordHelp(wordList[currentIndex]);
                 errorCount = 0;
             } else {
                 showFeedback(`❌ Bijna! We hoorden "${spoken}". Probeer nog eens!`, 'error');
             }
+            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
         }
-        document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
     }
 
     // Hulpspreker bij 2x fout
@@ -619,20 +687,27 @@
         }
     }
 
+    // Feestelijk Eindscherm
+    function showCompletionView() {
+        stopSpeechAndTimers();
+        switchStep('step-finished');
+        
+        // Grote confettiregen
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+        setTimeout(() => {
+            confetti({ particleCount: 100, angle: 60, spread: 55, origin: { x: 0 } });
+            confetti({ particleCount: 100, angle: 120, spread: 55, origin: { x: 1 } });
+        }, 400);
+    }
+
     // 5 VERSCHILLENDE SUCCES ANIMATIES
     function triggerRandomAnimation() {
         const choice = Math.floor(Math.random() * 5);
 
         if (choice === 0) {
-            // 1. Confetti Burst
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         } 
         else if (choice === 1) {
-            // 2. Sterrenregen
             confetti({
                 particleCount: 80,
                 spread: 100,
@@ -642,16 +717,13 @@
             });
         } 
         else if (choice === 2) {
-            // 3. Dubbel Zij-Kanon
             confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0, y: 0.7 } });
             confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1, y: 0.7 } });
         } 
         else if (choice === 3) {
-            // 4. Bouncing Thumbs Up
             showOverlayEmoji('👍', 'thumbs-up-anim');
         } 
         else if (choice === 4) {
-            // 5. Feest / Applaus Emojis
             showOverlayEmoji('🎉 👏', 'floating-emoji');
         }
     }
@@ -668,11 +740,14 @@
         }, 1500);
     }
 
-    function nextWord() {
+    function nextWord(autoListen = false) {
         if (currentIndex < wordList.length - 1) {
             currentIndex++;
             errorCount = 0;
             updateSingleWordUI();
+            if (autoListen) {
+                setTimeout(() => startListening(), 300);
+            }
         }
     }
 
