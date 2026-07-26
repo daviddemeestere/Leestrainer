@@ -732,7 +732,7 @@
                 const feedbackText = `Bijna! We hoorden ${spokenClean}. Probeer nog eens!`;
                 showFeedback(`❌ ${feedbackText}`, 'error');
                 
-                speakText(`Bijna! We hoorden ${spokenClean}`, 0.75, () => {
+                speakText(`Bijna! We hoorden ${spokenClean}. Probeer nog eens!`, 0.75, () => {
                     document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
                 });
             }
