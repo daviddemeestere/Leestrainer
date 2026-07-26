@@ -5,12 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Interactieve Leestrainer v2</title>
+    <title>Leestrainer</title>
 
+    <!-- Cropper.js CSS & JS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
+    <!-- Tesseract.js -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <!-- Canvas Confetti Library voor animaties -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
         :root {
@@ -33,6 +38,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
 
         .container {
@@ -43,9 +49,10 @@
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
             box-sizing: border-box;
+            position: relative;
         }
 
-        h1 { font-size: 1.4rem; text-align: center; margin-top: 0; color: var(--primary); }
+        h1 { font-size: 1.6rem; text-align: center; margin-top: 0; color: var(--primary); }
         
         .step-panel { display: none; }
         .step-panel.active { display: block; }
@@ -95,20 +102,21 @@
 
         .method-tabs {
             display: flex;
-            gap: 5px;
+            gap: 8px;
             margin-bottom: 15px;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 10px 5px;
-            font-size: 0.82rem;
-            border: 1px solid #D1D5DB;
+            padding: 12px 5px;
+            font-size: 1.1rem;
+            border: 2px solid #D1D5DB;
             background: #F9FAFB;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: bold;
             cursor: pointer;
             text-align: center;
+            color: #4B5563;
         }
 
         .tab-btn.active {
@@ -117,7 +125,6 @@
             border-color: var(--primary);
         }
 
-        /* Weergave Volledige Lijst (Voorlezen & In Koor) */
         .full-list-card {
             background-color: #F9FAFB;
             border: 2px dashed #CBD5E1;
@@ -151,7 +158,6 @@
             color: #854D0E;
         }
 
-        /* Weergave Enkel Woord (Zelf lezen) */
         .single-word-card {
             background-color: #EEF2FF;
             border: 3px solid var(--primary);
@@ -163,6 +169,7 @@
             letter-spacing: 2px;
             margin: 15px 0;
             color: #312E81;
+            position: relative;
         }
 
         .feedback-box {
@@ -172,7 +179,7 @@
             font-weight: bold;
             margin-top: 15px;
             display: none;
-            font-size: 1rem;
+            font-size: 1.05rem;
         }
         .feedback-box.success { display: block; background-color: #D1FAE5; color: #065F46; }
         .feedback-box.error { display: block; background-color: #FEE2E2; color: #991B1B; }
@@ -200,13 +207,52 @@
             margin: 10px 0;
             min-height: 32px;
         }
+
+        /* Overlay Animaties voor Succes */
+        .anim-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .floating-emoji {
+            font-size: 5rem;
+            animation: popAndFade 1.2s ease-out forwards;
+        }
+
+        @keyframes popAndFade {
+            0% { transform: scale(0.2) translateY(50px); opacity: 0; }
+            50% { transform: scale(1.3) translateY(-20px); opacity: 1; }
+            100% { transform: scale(1) translateY(-100px); opacity: 0; }
+        }
+
+        .thumbs-up-anim {
+            font-size: 6rem;
+            animation: bounceIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>📖 Leestrainer v2</h1>
+<div id="anim-container" class="anim-overlay"></div>
 
+<div class="container">
+    <h1>📖 Leestrainer</h1>
+
+    <!-- STAP 1: FOTO MAKEN & BIJSNIJDEN -->
     <div id="step-upload" class="step-panel active">
         <p style="text-align:center; font-size: 0.9rem; color: #666;">Neem een foto van het woordrijtje of kies een afbeelding.</p>
         
@@ -222,27 +268,31 @@
         <div id="ocr-loader" class="loader">⏳ Tekst wordt herkend...</div>
     </div>
 
+    <!-- STAP 2: TEKST CONTROLEREN -->
     <div id="step-review" class="step-panel">
         <p><strong>Herkende woorden in het rijtje:</strong><br><small style="color:#666;">Plaats elk woord op een nieuwe regel.</small></p>
         <textarea id="words-input" placeholder="Elk woord op een nieuwe regel..."></textarea>
         <button id="start-practice-btn" class="btn">🚀 Start Leesoefening</button>
     </div>
 
+    <!-- STAP 3: OEFENING MET 3 MODI -->
     <div id="step-practice" class="step-panel">
         
+        <!-- Tabbladen: VOOR - KOOR - DOOR -->
         <div class="method-tabs">
-            <button class="tab-btn active" id="tab-1" onclick="setMode(1)">1. Voorlezen<br><small>(Hele rijtje)</small></button>
-            <button class="tab-btn" id="tab-2" onclick="setMode(2)">2. In koor<br><small>(Hele rijtje)</small></button>
-            <button class="tab-btn" id="tab-3" onclick="setMode(3)">3. Zelf lezen<br><small>(Per woord)</small></button>
+            <button class="tab-btn active" id="tab-1" onclick="setMode(1)">VOOR</button>
+            <button class="tab-btn" id="tab-2" onclick="setMode(2)">KOOR</button>
+            <button class="tab-btn" id="tab-3" onclick="setMode(3)">DOOR</button>
         </div>
 
+        <!-- WEERGAVE VOOR VOOR & KOOR (VOLLEDIGE RIJTJE) -->
         <div id="full-list-view">
             <div class="countdown-banner" id="countdown-banner"></div>
-            <div class="full-list-card" id="full-list-container">
-                </div>
+            <div class="full-list-card" id="full-list-container"></div>
             <button id="play-list-btn" class="btn" onclick="handleFullListAction()">🔊 Beluister het hele rijtje</button>
         </div>
 
+        <!-- WEERGAVE VOOR DOOR (ZELF LEZEN PER WOORD) -->
         <div id="single-word-view" style="display:none;">
             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666; margin-bottom: 5px;">
                 <span id="progress-text">Woord 1 van 5</span>
@@ -268,9 +318,10 @@
     let cropper = null;
     let wordList = [];
     let currentIndex = 0;
-    let currentMode = 1; 
+    let currentMode = 1; // 1: VOOR, 2: KOOR, 3: DOOR
     let recognition = null;
     let isPlayingList = false;
+    let errorCount = 0; // Telt het aantal fouten op het huidige woord
 
     const cameraInput = document.getElementById('camera-input');
     const imageToCrop = document.getElementById('image-to-crop');
@@ -279,7 +330,7 @@
     const ocrLoader = document.getElementById('ocr-loader');
     const wordsInput = document.getElementById('words-input');
 
-    // Web Speech API
+    // Web Speech API - Spraakherkenning
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
@@ -407,6 +458,7 @@
         else if (mode === 3) {
             fullListView.style.display = 'none';
             singleWordView.style.display = 'block';
+            errorCount = 0;
             updateSingleWordUI();
         }
     }
@@ -418,8 +470,10 @@
         }
 
         if (currentMode === 1) {
-            readFullListSequentially(0.7, 500);
+            // VOOR: Zeer traag leestempo (0.55) voor maximale helderheid
+            readFullListSequentially(0.55, 600);
         } else if (currentMode === 2) {
+            // KOOR: Aftellen en traag leestempo (0.60)
             const banner = document.getElementById('countdown-banner');
             let count = 3;
             banner.innerText = `⏳ Samen lezen in ${count}...`;
@@ -431,13 +485,13 @@
                 } else {
                     clearInterval(timer);
                     banner.innerText = "🗣️ Nu samen lezen!";
-                    readFullListSequentially(0.75, 600);
+                    readFullListSequentially(0.60, 700);
                 }
             }, 900);
         }
     }
 
-    function readFullListSequentially(rate = 0.7, pauseMs = 500) {
+    function readFullListSequentially(rate = 0.55, pauseMs = 600) {
         if (!('speechSynthesis' in window)) {
             alert("Spraakuitvoer wordt niet ondersteund op dit apparaat.");
             return;
@@ -456,6 +510,7 @@
             if (index >= wordList.length || !isPlayingList) {
                 stopSpeechAndTimers();
                 showFeedback("🎉 Rijtje voltooid!", 'success');
+                triggerRandomAnimation();
                 return;
             }
 
@@ -499,6 +554,7 @@
         }
     }
 
+    // DOOR (Per woord lezen)
     function updateSingleWordUI() {
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
@@ -521,25 +577,101 @@
         }
     }
 
+    // Beoordeling met strengere match & 2x fout regel
     function evaluateSpeech(spoken) {
         const target = wordList[currentIndex].toLowerCase().trim();
+        const spokenClean = spoken.toLowerCase().trim();
         
-        if (spoken === target || target.includes(spoken) || spoken.includes(target)) {
+        // STRENGERE MATCH: Exacte vergelijking
+        if (spokenClean === target) {
+            errorCount = 0;
             showFeedback(` Perfect gelezen! ("${spoken}")`, 'success');
+            triggerRandomAnimation();
+            
             setTimeout(() => {
                 if (currentMode === 3 && currentIndex < wordList.length - 1) {
                     nextWord();
                 }
-            }, 1500);
+            }, 1800);
         } else {
-            showFeedback(`❌ Bijna! We hoorden "${spoken}". Probeer het nog eens!`, 'error');
+            errorCount++;
+            
+            if (errorCount >= 2) {
+                // BIJ 2X FOUT: Lees het woord voor als hulp!
+                showFeedback(`💡 Luister goed naar de juiste uitspraak!`, 'error');
+                speakWordHelp(wordList[currentIndex]);
+                errorCount = 0;
+            } else {
+                showFeedback(`❌ Bijna! We hoorden "${spoken}". Probeer nog eens!`, 'error');
+            }
         }
         document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+    }
+
+    // Hulpspreker bij 2x fout
+    function speakWordHelp(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'nl-NL';
+            utterance.rate = 0.5;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    // 5 VERSCHILLENDE SUCCES ANIMATIES
+    function triggerRandomAnimation() {
+        const choice = Math.floor(Math.random() * 5);
+
+        if (choice === 0) {
+            // 1. Confetti Burst
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        } 
+        else if (choice === 1) {
+            // 2. Sterrenregen
+            confetti({
+                particleCount: 80,
+                spread: 100,
+                origin: { y: 0.6 },
+                shapes: ['star'],
+                colors: ['#FFE100', '#FFBD00', '#E80054']
+            });
+        } 
+        else if (choice === 2) {
+            // 3. Dubbel Zij-Kanon
+            confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0, y: 0.7 } });
+            confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1, y: 0.7 } });
+        } 
+        else if (choice === 3) {
+            // 4. Bouncing Thumbs Up
+            showOverlayEmoji('👍', 'thumbs-up-anim');
+        } 
+        else if (choice === 4) {
+            // 5. Feest / Applaus Emojis
+            showOverlayEmoji('🎉 👏', 'floating-emoji');
+        }
+    }
+
+    function showOverlayEmoji(emoji, cssClass) {
+        const container = document.getElementById('anim-container');
+        const el = document.createElement('div');
+        el.className = cssClass;
+        el.innerText = emoji;
+        container.appendChild(el);
+
+        setTimeout(() => {
+            el.remove();
+        }, 1500);
     }
 
     function nextWord() {
         if (currentIndex < wordList.length - 1) {
             currentIndex++;
+            errorCount = 0;
             updateSingleWordUI();
         }
     }
@@ -547,6 +679,7 @@
     function prevWord() {
         if (currentIndex > 0) {
             currentIndex--;
+            errorCount = 0;
             updateSingleWordUI();
         }
     }
