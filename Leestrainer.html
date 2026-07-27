@@ -17,6 +17,7 @@
             --text: #1F2937;
             --highlight: #FEF08A;
             --error: #EF4444;
+            --success: #10B981;
         }
 
         body {
@@ -74,7 +75,7 @@
 
         input[type="file"] { display: none; }
 
-        /* BOVENSTE BALK MET ZOOM EN "LAATSTE WISSEN" */
+        /* BOVENSTE BALK MET ZOOM, WISSEN EN HERKEN TEKST */
         .zoom-bar {
             display: flex; 
             justify-content: space-between; 
@@ -88,13 +89,44 @@
         }
 
         .zoom-btn {
-            background: #FFFFFF; border: 1px solid #CBD5E1; padding: 6px 12px;
-            border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; color: var(--primary);
+            background: #FFFFFF; border: 1px solid #CBD5E1; padding: 6px 10px;
+            border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; color: var(--primary);
         }
 
         .btn-undo-top {
             background: #FEE2E2; color: #DC2626; border: 1px solid #FCA5A5;
-            padding: 6px 12px; border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer;
+            padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer;
+        }
+
+        .btn-process-top {
+            background: var(--success); color: white; border: none;
+            padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer;
+        }
+
+        /* ANKER KNOPPEN STYLING */
+        .anker-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-anker {
+            background-color: #EEF2FF;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 10px 5px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-anker:hover {
+            background-color: var(--primary);
+            color: white;
         }
 
         /* DUIDELIJK ZICHTBARE SCROLLBALKEN */
@@ -105,27 +137,16 @@
             margin: 10px 0;
             background: #0F172A; 
             border-radius: 12px; 
-            overflow: scroll; /* Forceert scrollbalken bij inzoomen */
+            overflow: scroll;
             -webkit-overflow-scrolling: touch; 
             border: 2px solid #CBD5E1;
             scrollbar-width: auto;
             scrollbar-color: #4F46E5 #E2E8F0;
         }
 
-        /* Webkit (Chrome, Safari, iOS) Duidelijke Scrollbalk Styling */
-        .canvas-container::-webkit-scrollbar {
-            width: 12px;
-            height: 12px;
-        }
-        .canvas-container::-webkit-scrollbar-track {
-            background: #E2E8F0;
-            border-radius: 6px;
-        }
-        .canvas-container::-webkit-scrollbar-thumb {
-            background-color: var(--primary);
-            border-radius: 6px;
-            border: 2px solid #E2E8F0;
-        }
+        .canvas-container::-webkit-scrollbar { width: 12px; height: 12px; }
+        .canvas-container::-webkit-scrollbar-track { background: #E2E8F0; border-radius: 6px; }
+        .canvas-container::-webkit-scrollbar-thumb { background-color: var(--primary); border-radius: 6px; border: 2px solid #E2E8F0; }
 
         canvas { display: block; cursor: crosshair; touch-action: auto; }
 
@@ -189,6 +210,12 @@
         .loader { text-align: center; display: none; margin: 15px 0; font-weight: bold; color: var(--primary); }
         .nav-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
 
+        .score-card {
+            display: none; margin: 15px 0; font-size: 1.3rem; font-weight: bold; 
+            color: var(--primary); background: #EEF2FF; padding: 15px; 
+            border-radius: 12px; border: 2px solid var(--primary); text-align: center;
+        }
+
         .anim-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 999;
             display: flex; justify-content: center; align-items: center;
@@ -214,45 +241,61 @@
         <button class="btn-home" onclick="resetApp()">🏠 Home</button>
     </div>
 
-    <!-- STAP 1 -->
+    <!-- STAP 1: KEUZE FOTO OF ANKER -->
     <div id="step-upload" class="step-panel active">
         <label for="camera-input" class="btn">📸 Foto Maken / Kiezen</label>
         <input type="file" id="camera-input" accept="image/*" capture="environment">
 
-        <div id="draw-controls" style="display:none;">
-            <!-- BOVENBALK MET ZOOM EN LAATSTE WISSEN -->
+        <!-- ANKER SELECTIE -->
+        <div style="margin-top: 20px; border-top: 2px solid #F3F4F6; padding-top: 15px;">
+            <p style="font-weight: bold; text-align: center; margin-bottom: 10px; color: #4B5563;">
+                📚 Of kies een Anker (10 willekeurige woorden):
+            </p>
+            <div class="anker-grid">
+                <button class="btn-anker" onclick="loadAnker(1)">⚓ Anker 1</button>
+                <button class="btn-anker" onclick="loadAnker(2)">⚓ Anker 2</button>
+                <button class="btn-anker" onclick="loadAnker(3)">⚓ Anker 3</button>
+                <button class="btn-anker" onclick="loadAnker(4)">⚓ Anker 4</button>
+                <button class="btn-anker" onclick="loadAnker(5)">⚓ Anker 5</button>
+            </div>
+        </div>
+
+        <!-- FOTO SNIJDEN CONTROLS -->
+        <div id="draw-controls" style="display:none; margin-top: 15px;">
             <div class="zoom-bar">
                 <div style="display: flex; align-items: center; gap: 4px;">
-                    <span style="font-size: 0.9rem; font-weight: bold;">🔍 Zoom:</span>
+                    <span style="font-size: 0.85rem; font-weight: bold;">🔍 Zoom:</span>
                     <button class="zoom-btn" onclick="adjustZoom(0.3)">➕</button>
                     <button class="zoom-btn" onclick="adjustZoom(-0.3)">➖</button>
                     <button class="zoom-btn" onclick="resetZoom()">🔄</button>
                 </div>
-                <button id="undo-box-btn" class="btn-undo-top">↩️ Laatste wissen</button>
+                <div style="display: flex; gap: 6px;">
+                    <button id="undo-box-btn" class="btn-undo-top">↩️ Wissen</button>
+                    <button id="process-boxes-btn" class="btn-process-top">✂️ Herken tekst</button>
+                </div>
             </div>
 
             <div class="canvas-container" id="canvas-container">
                 <canvas id="image-canvas"></canvas>
             </div>
 
-            <p style="text-align:center; font-size: 0.85rem; color: #4B5563; margin: 5px 0 10px 0;">
-                👉 Trek een kader. Gebruik de scrollbalken om te schuiven bij inzoomen.
+            <p style="text-align:center; font-size: 0.85rem; color: #4B5563; margin: 8px 0;">
+                👉 Trek een kader om een woordrijtje te selecteren.<br>
+                👉 Gebruik twee vingers om de foto te verschuiven.
             </p>
-            
-            <button id="process-boxes-btn" class="btn">✂️ Herken Tekst Uit Vakken</button>
         </div>
 
         <div id="ocr-loader" class="loader">⏳ Tekst wordt herkend...</div>
     </div>
 
-    <!-- STAP 2 -->
+    <!-- STAP 2: CONTROLEER WOORDEN -->
     <div id="step-review" class="step-panel">
-        <p><strong>Herkende woorden:</strong></p>
+        <p><strong>Herkende / Geselecteerde woorden:</strong></p>
         <textarea id="words-input" placeholder="Elk woord op een nieuwe regel..."></textarea>
         <button id="start-practice-btn" class="btn">🚀 Start Leesoefening</button>
     </div>
 
-    <!-- STAP 3 -->
+    <!-- STAP 3: OEFENEN -->
     <div id="step-practice" class="step-panel">
         <div class="method-tabs">
             <button class="tab-btn active" id="tab-1" onclick="setMode(1)">VOOR</button>
@@ -289,18 +332,30 @@
         <div id="picto-feedback" class="picto-feedback"></div>
     </div>
 
-    <!-- STAP 4 -->
+    <!-- STAP 4: AFGEROND & SCORE -->
     <div id="step-finished" class="step-panel">
         <div style="text-align: center; padding: 20px 10px;">
             <div style="font-size: 5rem;">🏆🌟🎉</div>
-            <h2 style="color: var(--primary);">Super gedaan!</h2>
+            <h2 style="color: var(--primary); margin-bottom: 5px;">Super gedaan!</h2>
+            
+            <div id="score-display" class="score-card"></div>
+
             <button class="btn" onclick="setMode(1); switchStep('step-practice');">🔄 Nog eens oefenen</button>
-            <button class="btn btn-secondary" onclick="resetApp()">📸 Nieuwe foto maken</button>
+            <button class="btn btn-secondary" onclick="resetApp()">🏠 Terug naar menu</button>
         </div>
     </div>
 </div>
 
 <script>
+    /* ANKER WOORDENLIJSTEN */
+    const ANKERS = {
+        1: ["en","een","in","is","ik","maar","er","voor","ben","aan","naar","ook","meer","mee","men","keek","maak","keer","paar","vaak","nee","neem","naam","ver","eer","ken","boom","neer","raam","boos","maan","oom","baas","been","vis","oor","koop","raak","mis","nek","raar","min","baan","koos","meen","rook","mes","beer","kip","kaas","aap","bek","neen","ren","kin","roos","poos","pen","koor","vee"],
+        2: ["en","een","het","van","in","is","hij","zijn","dat","ik","met","maar","er","voor","zij","ben","aan","naar","haar","ook","dan","bij","door","hem","kan","mijn","dit","hun","toen","daar","meer","moet","kun","hoe","mij","doen","mee","man","men","dus","keek","toe","doet","doe","zit","zat","net","maak","hen","keer","paar","kijk","vaak","heen","nam","nee","hoor","neem","naam","ver"],
+        3: ["en","een","het","van","in","is","hij","zijn","dat","ik","op","was","die","niet","met","maar","er","voor","zij","ben","aan","naar","wees","haar","ook","om","dan","wat","bij","door","hem","uit","wel","kan","mijn","dit","hun","kon","al","toen","daar","tot","meer","weer","zal","moet","veel","kun","hoe","mij","heel","waar","zul","zien","hier","wil","doen","kom","jaar","mee"],
+        4: ["de","en","een","het","van","in","is","hij","te","zijn","dat","ik","op","ze","was","die","je","niet","met","maar","er","voor","zij","ben","aan","naar","wees","haar","ook","om","dan","wat","of","nog","bij","door","hem","zich","uit","zei","wel","zou","we","kan","mijn","dit","hun","geen","kon","al","toen","daar","tot","meer","weer","zal","gaan","moet","veel","ging"],
+        5: ["de","en","een","het","van","in","is","hij","te","zijn","dat","ik","op","ze","was","die","je","niet","met","maar","er","voor","als","zij","ben","aan","bent","naar","had","wees","haar","ook","heeft","om","dan","heb","wat","of","nog","bij","door","hem","werd","zich","uit","zei","wel","zou","we","kan","mijn","dit","hun","geen","kon","al","toen","daar","word","tot"]
+    };
+
     let loadedImage = null;
     let canvas = document.getElementById('image-canvas');
     let ctx = canvas.getContext('2d');
@@ -320,6 +375,10 @@
     let isPlayingList = false;
     let isProcessingSpeech = false;
     let hasMatchedInSession = false;
+
+    /* SCORE TRACKING */
+    let correctCount = 0;
+    let currentWordFailed = false;
 
     const cameraInput = document.getElementById('camera-input');
     const canvasContainer = document.getElementById('canvas-container');
@@ -345,6 +404,19 @@
         if (onEndCallback) utterance.onend = onEndCallback;
 
         window.speechSynthesis.speak(utterance);
+    }
+
+    /* LADEN VAN ANKER WOORDEN */
+    function loadAnker(num) {
+        const list = ANKERS[num];
+        if (!list) return;
+
+        // Kies 10 unieke willekeurige woorden
+        const shuffled = [...list].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 10);
+
+        wordsInput.value = selected.join('\n');
+        switchStep('step-review');
     }
 
     cameraInput.addEventListener('change', (e) => {
@@ -547,12 +619,11 @@
     }, { passive: false });
     canvas.addEventListener('touchend', handleEnd);
 
-    // KNOP LAATSTE WISSEN (BOVENAAN)
     document.getElementById('undo-box-btn').addEventListener('click', () => { boxes.pop(); redrawCanvas(); });
 
-    /* OCR OPSCHONING */
+    /* OCR VERWERKING */
     document.getElementById('process-boxes-btn').addEventListener('click', async () => {
-        if (boxes.length === 0) return alert("Trek eerst een kader rond een rijtje.");
+        if (boxes.length === 0) return alert("Trek eerst een kader rond een woordrijtje.");
         canvasContainer.style.display = 'none'; drawControls.style.display = 'none'; ocrLoader.style.display = 'block';
 
         let allRecognizedWords = [];
@@ -571,15 +642,7 @@
                 result.data.text.split('\n').forEach(line => {
                     let clean = line.replace(/[^a-zA-ZáéíóúäëïöüÅå-]/g, "").trim();
                     if (clean.length > 0) {
-                        let formattedWord;
-                        const isProperNounFormat = /^[A-ZÁÉÍÓÚÄËÏÖÜ][a-záéíóúäëïöü-]+$/.test(clean);
-                        
-                        if (isProperNounFormat) {
-                            formattedWord = clean;
-                        } else {
-                            formattedWord = clean.toLowerCase();
-                        }
-
+                        let formattedWord = /^[A-ZÁÉÍÓÚÄËÏÖÜ][a-záéíóúäëïöü-]+$/.test(clean) ? clean : clean.toLowerCase();
                         allRecognizedWords.push(formattedWord);
                     }
                 });
@@ -662,6 +725,10 @@
     }
 
     function evaluateSpeechSuccess() {
+        if (!currentWordFailed) {
+            correctCount++;
+        }
+
         showPictoFeedback('🌟 Goed zo!', false);
         triggerRandomAnimation();
 
@@ -679,6 +746,8 @@
 
     function handleSpeechError() {
         isProcessingSpeech = true;
+        currentWordFailed = true;
+
         const card = document.getElementById('target-word');
         card.classList.add('shake');
         setTimeout(() => card.classList.remove('shake'), 400);
@@ -709,12 +778,13 @@
         try { recognition.start(); } catch(e) { recognition.stop(); recognition.start(); }
     }
 
-    /* OEFENMODI & KOORLEZEN */
+    /* OEFENMODI */
     document.getElementById('start-practice-btn').addEventListener('click', () => {
         const rawText = wordsInput.value.trim();
         if (!rawText) return;
         wordList = rawText.split('\n').map(w => w.trim()).filter(w => w.length > 0);
         currentIndex = 0;
+        correctCount = 0;
         switchStep('step-practice');
         renderFullList();
         setMode(1);
@@ -755,6 +825,7 @@
             singleWordView.style.display = 'block';
             speedControl.style.display = 'none';
             currentIndex = 0;
+            correctCount = 0;
             updateSingleWordUI();
         }
     }
@@ -845,6 +916,7 @@
     }
 
     function updateSingleWordUI() {
+        currentWordFailed = false;
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
         document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
@@ -889,6 +961,15 @@
 
     function showCompletionView() {
         stopSpeechAndTimers();
+        
+        const scoreElem = document.getElementById('score-display');
+        if (currentMode === 3) {
+            scoreElem.style.display = 'block';
+            scoreElem.innerHTML = `🎯 Score: <strong>${correctCount} / ${wordList.length}</strong> goed in één keer!`;
+        } else {
+            scoreElem.style.display = 'none';
+        }
+
         switchStep('step-finished');
         confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
     }
