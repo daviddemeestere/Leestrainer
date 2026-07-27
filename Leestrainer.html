@@ -75,7 +75,6 @@
 
         input[type="file"] { display: none; }
 
-        /* BOVENSTE BALK MET ZOOM, WISSEN EN HERKEN TEKST */
         .zoom-bar {
             display: flex; 
             justify-content: space-between; 
@@ -103,10 +102,9 @@
             padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer;
         }
 
-        /* ANKER KNOPPEN STYLING */
         .anker-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 8px;
             margin-top: 10px;
         }
@@ -115,10 +113,10 @@
             background-color: #EEF2FF;
             color: var(--primary);
             border: 2px solid var(--primary);
-            padding: 10px 5px;
+            padding: 12px 0;
             border-radius: 10px;
             font-weight: bold;
-            font-size: 0.95rem;
+            font-size: 1.2rem;
             cursor: pointer;
             text-align: center;
             transition: all 0.2s ease;
@@ -129,7 +127,6 @@
             color: white;
         }
 
-        /* DUIDELIJK ZICHTBARE SCROLLBALKEN */
         .canvas-container {
             position: relative; 
             width: 100%; 
@@ -243,24 +240,22 @@
 
     <!-- STAP 1: KEUZE FOTO OF ANKER -->
     <div id="step-upload" class="step-panel active">
-        <label for="camera-input" class="btn">📸 Foto Maken / Kiezen</label>
+        <label for="camera-input" class="btn">📸 Foto maken</label>
         <input type="file" id="camera-input" accept="image/*" capture="environment">
 
-        <!-- ANKER SELECTIE -->
         <div style="margin-top: 20px; border-top: 2px solid #F3F4F6; padding-top: 15px;">
             <p style="font-weight: bold; text-align: center; margin-bottom: 10px; color: #4B5563;">
-                📚 Of kies een Anker (10 willekeurige woorden):
+                📚 Of kies een Anker:
             </p>
             <div class="anker-grid">
-                <button class="btn-anker" onclick="loadAnker(1)">⚓ Anker 1</button>
-                <button class="btn-anker" onclick="loadAnker(2)">⚓ Anker 2</button>
-                <button class="btn-anker" onclick="loadAnker(3)">⚓ Anker 3</button>
-                <button class="btn-anker" onclick="loadAnker(4)">⚓ Anker 4</button>
-                <button class="btn-anker" onclick="loadAnker(5)">⚓ Anker 5</button>
+                <button class="btn-anker" onclick="loadAnker(1)">1</button>
+                <button class="btn-anker" onclick="loadAnker(2)">2</button>
+                <button class="btn-anker" onclick="loadAnker(3)">3</button>
+                <button class="btn-anker" onclick="loadAnker(4)">4</button>
+                <button class="btn-anker" onclick="loadAnker(5)">5</button>
             </div>
         </div>
 
-        <!-- FOTO SNIJDEN CONTROLS -->
         <div id="draw-controls" style="display:none; margin-top: 15px;">
             <div class="zoom-bar">
                 <div style="display: flex; align-items: center; gap: 4px;">
@@ -325,7 +320,7 @@
 
             <div class="nav-buttons">
                 <button class="btn btn-outline" style="margin:0;" onclick="prevWord()">⬅️ Vorige</button>
-                <button class="btn btn-outline" style="margin:0;" onclick="nextWord(false)">Volgende ➡️</button>
+                <button class="btn btn-outline" style="margin:0;" onclick="nextWord()">Volgende ➡️</button>
             </div>
         </div>
 
@@ -375,8 +370,8 @@
     let isPlayingList = false;
     let isProcessingSpeech = false;
     let hasMatchedInSession = false;
+    let hasReceivedSpeech = false;
 
-    /* SCORE TRACKING */
     let correctCount = 0;
     let currentWordFailed = false;
 
@@ -406,12 +401,10 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    /* LADEN VAN ANKER WOORDEN */
     function loadAnker(num) {
         const list = ANKERS[num];
         if (!list) return;
 
-        // Kies 10 unieke willekeurige woorden
         const shuffled = [...list].sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, 10);
 
@@ -654,17 +647,26 @@
         switchStep('step-review');
     });
 
-    /* SPRAAKHERKENNING */
+    /* VERBETERDE SPRAAKHERKENNING */
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'nl-BE';
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.maxAlternatives = 3;
+        recognition.maxAlternatives = 5;
+
+        recognition.onstart = () => {
+            isProcessingSpeech = false;
+            hasMatchedInSession = false;
+            hasReceivedSpeech = false;
+            document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
+            showPictoFeedback("👂 Ik luister...", false);
+        };
 
         recognition.onresult = (event) => {
             if (isProcessingSpeech) return;
+            hasReceivedSpeech = true;
 
             const target = wordList[currentIndex].toLowerCase().trim();
 
@@ -683,18 +685,46 @@
             }
         };
 
-        recognition.onend = () => {
-            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-            if (!hasMatchedInSession && !isProcessingSpeech) {
-                handleSpeechError();
+        recognition.onerror = (event) => {
+            if (event.error === 'no-speech') {
+                showPictoFeedback("🤐 Niets gehoord, probeer opnieuw!", false);
+            } else if (event.error === 'not-allowed') {
+                showPictoFeedback("⚠️ Geef microfoontoegang in je browser.", true);
             }
         };
 
-        recognition.onerror = () => {
+        recognition.onend = () => {
+            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+
             if (!hasMatchedInSession && !isProcessingSpeech) {
-                handleSpeechError();
+                if (hasReceivedSpeech) {
+                    // Er is wél gesproken, maar het was fout
+                    handleSpeechError();
+                } else {
+                    // Niks gehoord -> NIET meteen fout rekenen, vraag om nog eens te proberen
+                    showPictoFeedback("💡 Druk op de knop en spreek het woord uit.", false);
+                }
             }
         };
+    }
+
+    function startListening() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Stop eventueel voorlezen vooraf
+        showPictoFeedback('', false);
+        isProcessingSpeech = false;
+        hasMatchedInSession = false;
+        hasReceivedSpeech = false;
+        
+        if (!recognition) return alert("Spraakherkenning wordt niet ondersteund in deze browser.");
+
+        try { 
+            recognition.start(); 
+        } catch(e) { 
+            try {
+                recognition.stop(); 
+                setTimeout(() => recognition.start(), 100);
+            } catch(err) {}
+        }
     }
 
     function isFuzzyMatch(spoken, target) {
@@ -736,12 +766,12 @@
             isProcessingSpeech = false;
             if (currentMode === 3) {
                 if (currentIndex < wordList.length - 1) {
-                    nextWord(true);
+                    nextWord();
                 } else {
                     showCompletionView();
                 }
             }
-        }, 400);
+        }, 500);
     }
 
     function handleSpeechError() {
@@ -759,23 +789,12 @@
             setTimeout(() => {
                 isProcessingSpeech = false;
                 if (currentIndex < wordList.length - 1) {
-                    nextWord(true);
+                    nextWord();
                 } else {
                     showCompletionView();
                 }
             }, 600);
         });
-    }
-
-    function startListening() {
-        showPictoFeedback('', false);
-        isProcessingSpeech = false;
-        hasMatchedInSession = false;
-        
-        if (!recognition) return alert("Spraakherkenning wordt niet ondersteund in deze browser.");
-        
-        document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
-        try { recognition.start(); } catch(e) { recognition.stop(); recognition.start(); }
     }
 
     /* OEFENMODI */
@@ -944,11 +963,10 @@
         setTimeout(() => el.remove(), 800);
     }
 
-    function nextWord(autoListen = false) {
+    function nextWord() {
         if (currentIndex < wordList.length - 1) {
             currentIndex++;
             updateSingleWordUI();
-            if (autoListen) setTimeout(() => startListening(), 200);
         }
     }
 
