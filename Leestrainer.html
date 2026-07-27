@@ -3,18 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Leestrainer</title>
 
-    <!-- Cropper.js CSS & JS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-
-    <!-- Tesseract.js -->
+    <!-- Tesseract.js voor Tekstherkenning -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-    <!-- Canvas Confetti Library -->
+    <!-- Canvas Confetti voor beloningen -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
@@ -39,6 +33,7 @@
             flex-direction: column;
             align-items: center;
             overflow-x: hidden;
+            touch-action: manipulation;
         }
 
         .container {
@@ -76,14 +71,8 @@
             font-size: 0.9rem;
             font-weight: bold;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.2s ease;
         }
 
-        .btn-home:hover { background-color: #E5E7EB; }
-        
         .step-panel { display: none; }
         .step-panel.active { display: block; }
 
@@ -96,7 +85,7 @@
             color: white;
             border: none;
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 600;
             text-align: center;
             cursor: pointer;
@@ -105,19 +94,27 @@
 
         .btn-secondary { background-color: #6B7280; }
         .btn-outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
-        
+        .btn-danger { background-color: #DC2626; }
+
         input[type="file"] { display: none; }
-        
-        .img-container {
+
+        /* CANVAS WAAROP JE RECHTHOEKEN KUNT TEKENEN */
+        .canvas-container {
+            position: relative;
             width: 100%;
-            max-height: 350px;
             margin: 15px 0;
-            overflow: hidden;
-            border-radius: 10px;
             background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
         }
-        
-        img { max-width: 100%; display: block; }
+
+        canvas {
+            display: block;
+            width: 100%;
+            cursor: crosshair;
+            touch-action: none; /* Prevent scrolling during draw */
+        }
 
         textarea {
             width: 100%;
@@ -126,7 +123,7 @@
             border-radius: 10px;
             padding: 10px;
             box-sizing: border-box;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             margin-bottom: 10px;
             line-height: 1.5;
         }
@@ -156,7 +153,37 @@
             border-color: var(--primary);
         }
 
-        /* VERTIKALE WOORDENLIJST WEERGAVE */
+        /* TEMPO SCHUIFKNOP */
+        .speed-control {
+            background: #EEF2FF;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .speed-control label {
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+
+        .speed-slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            outline: none;
+            accent-color: var(--primary);
+        }
+
+        .speed-icon {
+            font-size: 1.3rem;
+        }
+
+        /* VERTIKALE WOORDENLIJST */
         .full-list-card {
             background-color: #F9FAFB;
             border: 2px dashed #CBD5E1;
@@ -164,7 +191,7 @@
             padding: 20px;
             margin: 15px 0;
             display: flex;
-            flex-direction: column; /* Woorden onder elkaar */
+            flex-direction: column;
             gap: 12px;
             align-items: center;
             min-height: 120px;
@@ -173,9 +200,9 @@
         .word-badge {
             background: #FFFFFF;
             border: 1px solid #CBD5E1;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 12px;
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 600;
             color: #334155;
             transition: all 0.2s ease;
@@ -198,25 +225,23 @@
             border-radius: 16px;
             padding: 30px;
             text-align: center;
-            font-size: 2.5rem;
+            font-size: 2.8rem;
             font-weight: bold;
             letter-spacing: 2px;
             margin: 15px 0;
             color: #312E81;
-            position: relative;
         }
 
-        .feedback-box {
-            padding: 15px;
-            border-radius: 10px;
+        /* FEEDBACK MET PICTO'S (GEEN TEKST DUS) */
+        .picto-feedback {
             text-align: center;
-            font-weight: bold;
-            margin-top: 15px;
-            display: none;
-            font-size: 1.05rem;
+            font-size: 4rem;
+            min-height: 70px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        .feedback-box.success { display: block; background-color: #D1FAE5; color: #065F46; }
-        .feedback-box.error { display: block; background-color: #FEE2E2; color: #991B1B; }
 
         .loader {
             text-align: center;
@@ -244,10 +269,7 @@
 
         .anim-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
+            top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none;
             z-index: 999;
             display: flex;
@@ -255,19 +277,8 @@
             align-items: center;
         }
 
-        .floating-emoji {
-            font-size: 5rem;
-            animation: popAndFade 1.2s ease-out forwards;
-        }
-
-        @keyframes popAndFade {
-            0% { transform: scale(0.2) translateY(50px); opacity: 0; }
-            50% { transform: scale(1.3) translateY(-20px); opacity: 1; }
-            100% { transform: scale(1) translateY(-100px); opacity: 0; }
-        }
-
         .thumbs-up-anim {
-            font-size: 6rem;
+            font-size: 7rem;
             animation: bounceIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
@@ -277,21 +288,8 @@
             100% { transform: scale(1); opacity: 0; }
         }
 
-        .finish-card {
-            text-align: center;
-            padding: 20px 10px;
-        }
-
-        .finish-icon {
-            font-size: 4.5rem;
-            margin-bottom: 10px;
-            animation: pulse 1.5s infinite alternate;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.15); }
-        }
+        .finish-card { text-align: center; padding: 20px 10px; }
+        .finish-icon { font-size: 5rem; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -301,28 +299,32 @@
 <div class="container">
     <div class="header-bar">
         <h1>📖 Leestrainer</h1>
-        <button class="btn-home" onclick="resetApp()" title="Opnieuw beginnen">🏠 Home</button>
+        <button class="btn-home" onclick="resetApp()">🏠 Home</button>
     </div>
 
-    <!-- STAP 1: FOTO MAKEN & BIJSNIJDEN -->
+    <!-- STAP 1: FOTO MAKEN & RECHTHOEKEN TEKENEN -->
     <div id="step-upload" class="step-panel active">
-        <p style="text-align:center; font-size: 0.9rem; color: #666;">Neem een foto van het woordrijtje of kies een afbeelding.</p>
-        
         <label for="camera-input" class="btn">📸 Foto Maken / Kiezen</label>
         <input type="file" id="camera-input" accept="image/*" capture="environment">
 
-        <div class="img-container" id="crop-area" style="display:none;">
-            <img id="image-to-crop" src="" alt="Woordrijtje">
+        <div class="canvas-container" id="canvas-container">
+            <canvas id="image-canvas"></canvas>
         </div>
 
-        <button id="crop-btn" class="btn" style="display:none;">✂️ Bijsnijden & Tekst Herkennen</button>
+        <div id="draw-controls" style="display:none;">
+            <p style="text-align:center; font-size: 0.95rem; color: #4B5563; margin: 5px 0 10px 0;">
+                👉 <strong>Trek een kader</strong> rond elk woordrijtje op de foto.
+            </p>
+            <button id="process-boxes-btn" class="btn">✂️ Herken Tekst Uit Vakken</button>
+            <button id="clear-boxes-btn" class="btn btn-secondary" style="margin-top: 5px;">🗑️ Wis Vakken</button>
+        </div>
 
         <div id="ocr-loader" class="loader">⏳ Tekst wordt herkend...</div>
     </div>
 
     <!-- STAP 2: TEKST CONTROLEREN -->
     <div id="step-review" class="step-panel">
-        <p><strong>Herkende woorden in het rijtje:</strong><br><small style="color:#666;">Elk woord staat op een nieuwe regel.</small></p>
+        <p><strong>Herkende woorden:</strong></p>
         <textarea id="words-input" placeholder="Elk woord op een nieuwe regel..."></textarea>
         <button id="start-practice-btn" class="btn">🚀 Start Leesoefening</button>
     </div>
@@ -335,16 +337,23 @@
             <button class="tab-btn" id="tab-3" onclick="setMode(3)">DOOR</button>
         </div>
 
+        <!-- TEMPO SCHUIFKNOP VOOR VOOR & KOOR -->
+        <div class="speed-control" id="speed-control-box">
+            <span class="speed-icon">🐢</span>
+            <input type="range" id="speed-slider" class="speed-slider" min="0.3" max="0.9" step="0.05" value="0.55">
+            <span class="speed-icon">🐇</span>
+        </div>
+
         <!-- WEERGAVE VOOR VOOR & KOOR -->
         <div id="full-list-view">
             <div class="countdown-banner" id="countdown-banner"></div>
             <div class="full-list-card" id="full-list-container"></div>
-            <button id="play-list-btn" class="btn" onclick="handleFullListAction()">🔊 Beluister het hele rijtje</button>
+            <button id="play-list-btn" class="btn" onclick="handleFullListAction()">🔊 Beluister het rijtje</button>
         </div>
 
         <!-- WEERGAVE VOOR DOOR -->
         <div id="single-word-view" style="display:none;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-bottom: 5px;">
                 <span id="progress-text">Woord 1 van 5</span>
             </div>
 
@@ -358,7 +367,8 @@
             </div>
         </div>
 
-        <div id="feedback" class="feedback-box"></div>
+        <!-- VISUELE PICTO FEEDBACK (GEEN LEESTEKST) -->
+        <div id="picto-feedback" class="picto-feedback"></div>
     </div>
 
     <!-- STAP 4: EINDSCHERM -->
@@ -366,9 +376,6 @@
         <div class="finish-card">
             <div class="finish-icon">🏆🌟🎉</div>
             <h2 style="color: var(--primary); margin-top: 0;">Super gedaan!</h2>
-            <p style="font-size: 1.15rem; line-height: 1.5; color: #374151;">
-                Je hebt <strong>alle woorden</strong> van dit rijtje helemaal zelf gelezen! 👏🎈
-            </p>
             <div style="margin-top: 25px;">
                 <button class="btn" onclick="setMode(1); switchStep('step-practice');">🔄 Rijtje nog eens oefenen</button>
                 <button class="btn btn-secondary" onclick="resetApp()">📸 Nieuwe foto maken</button>
@@ -378,167 +385,296 @@
 </div>
 
 <script>
-    let cropper = null;
+    // GLOBALE VARIABELEN
+    let loadedImage = null;
+    let canvas = document.getElementById('image-canvas');
+    let ctx = canvas.getContext('2d');
+    let boxes = []; // Bewaart de getekende kaders [{x, y, w, h}]
+    let isDrawing = false;
+    let startX, startY, currentX, currentY;
+
     let wordList = [];
     let currentIndex = 0;
     let currentMode = 1;
     let recognition = null;
     let isPlayingList = false;
-    let errorCount = 0;
+    errorCount = 0;
 
+    // DOM ELEMENTEN
     const cameraInput = document.getElementById('camera-input');
-    const imageToCrop = document.getElementById('image-to-crop');
-    const cropArea = document.getElementById('crop-area');
-    const cropBtn = document.getElementById('crop-btn');
+    const canvasContainer = document.getElementById('canvas-container');
+    const drawControls = document.getElementById('draw-controls');
     const ocrLoader = document.getElementById('ocr-loader');
     const wordsInput = document.getElementById('words-input');
 
-    // Spraakherkenning
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.lang = 'nl-BE';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (event) => {
-            const spokenWord = event.results[0][0].transcript.toLowerCase().trim();
-            evaluateSpeech(spokenWord);
-        };
-
-        recognition.onerror = (event) => {
-            showFeedback(`Geen spraak herkend. Probeer nog eens!`, 'error');
-            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-        };
-
-        recognition.onend = () => {
-            if(currentMode === 3 && document.getElementById('speak-btn').innerText.includes("luisteren")) {
-                document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-            }
-        };
-    }
-
-    // VLAAMSE SPRAAKUITVOER (TTS)
-    function speakText(text, rate = 0.6, onEndCallback = null) {
+    // 1. VLAAMSE SPRAAKUITVOER (TTS)
+    function speakText(text, onEndCallback = null) {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Snelheid ophalen uit de schuifknop
+        const speedVal = parseFloat(document.getElementById('speed-slider').value);
+        utterance.rate = speedVal;
         utterance.lang = 'nl-BE';
-        utterance.rate = rate;
 
         const voices = window.speechSynthesis.getVoices();
-        // Zoek expliciet naar een Belgisch-Nederlandse (Vlaamse) stem
+        // Zoek Vlaamse stem
         const flemishVoice = voices.find(v => 
             v.lang === 'nl-BE' || 
             v.lang.includes('BE') || 
             (v.lang.includes('nl') && (v.name.toLowerCase().includes('belgium') || v.name.toLowerCase().includes('flemish') || v.name.toLowerCase().includes('ellen')))
         );
 
-        if (flemishVoice) {
-            utterance.voice = flemishVoice;
-        }
-
-        if (onEndCallback) {
-            utterance.onend = onEndCallback;
-        }
+        if (flemishVoice) utterance.voice = flemishVoice;
+        if (onEndCallback) utterance.onend = onEndCallback;
 
         window.speechSynthesis.speak(utterance);
     }
 
-    // 1. Foto Upload & Cropper met volledige aanpasbaarheid (alle hoeken/zijden)
+    // 2. CANVAS INTERACTIE: RECHTHOEKEN TEKENEN
     cameraInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                imageToCrop.src = event.target.result;
-                cropArea.style.display = 'block';
-                cropBtn.style.display = 'block';
+        if (!file) return;
 
-                if (cropper) cropper.destroy();
-                cropper = new Cropper(imageToCrop, {
-                    viewMode: 1,
-                    autoCropArea: 0.85,
-                    responsive: true,
-                    restore: false,
-                    center: true,
-                    highlight: true,
-                    cropBoxMovable: true,
-                    cropBoxResizable: true, // Zorgt dat alle 8 punten/zijden werken
-                    toggleDragModeOnDblclick: false
-                });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            loadedImage = new Image();
+            loadedImage.onload = () => {
+                setupCanvas();
+                canvasContainer.style.display = 'block';
+                drawControls.style.display = 'block';
             };
-            reader.readAsDataURL(file);
-        }
+            loadedImage.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     });
 
-    // 2. OCR verwerking van de foto met KOLOM-detectie
-    cropBtn.addEventListener('click', async () => {
-        if (!cropper) return;
+    function setupCanvas() {
+        boxes = [];
+        const containerWidth = canvasContainer.clientWidth || 460;
+        const scale = containerWidth / loadedImage.width;
         
-        const canvas = cropper.getCroppedCanvas();
-        cropArea.style.display = 'none';
-        cropBtn.style.display = 'none';
-        ocrLoader.style.display = 'block';
+        canvas.width = containerWidth;
+        canvas.height = loadedImage.height * scale;
 
-        try {
-            const result = await Tesseract.recognize(canvas, 'nld');
-            ocrLoader.style.display = 'none';
+        redrawCanvas();
+    }
 
-            const rawText = result.data.text;
-            const parsedWords = parseTwoColumnsOrLines(rawText);
+    function redrawCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
 
-            wordsInput.value = parsedWords.join('\n');
-            switchStep('step-review');
-        } catch (err) {
-            alert('Er ging iets mis bij het lezen van de foto: ' + err.message);
-            ocrLoader.style.display = 'none';
-        }
-    });
+        // Teken alle opgeslagen kaders
+        boxes.forEach((box, index) => {
+            ctx.strokeStyle = '#4F46E5';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(box.x, box.y, box.w, box.h);
 
-    // Herkent 2 kolommen (gescheiden door spaties, stippen of lijnen) en zet rechts onder links
-    function parseTwoColumnsOrLines(text) {
-        const lines = text.split('\n');
-        let leftColumn = [];
-        let rightColumn = [];
-        let singleList = [];
-        let isTwoColumns = false;
+            ctx.fillStyle = 'rgba(79, 70, 229, 0.2)';
+            ctx.fillRect(box.x, box.y, box.w, box.h);
 
-        lines.forEach(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return;
-
-            // Splitst op minstens 2 spaties, tabs, stippellijnen (...), streepjes (---) of verticale strepen (|)
-            const parts = trimmed.split(/\s{2,}|\t+|\||\.{2,}|-{2,}/).map(p => cleanWord(p)).filter(p => p.length > 0);
-
-            if (parts.length >= 2) {
-                isTwoColumns = true;
-                leftColumn.push(parts[0]);
-                rightColumn.push(parts[1]);
-            } else if (parts.length === 1) {
-                singleList.push(parts[0]);
-            }
+            // Nummer van het vak
+            ctx.fillStyle = '#4F46E5';
+            ctx.fillRect(box.x, box.y, 26, 26);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText((index + 1).toString(), box.x + 8, box.y + 19);
         });
 
-        if (isTwoColumns) {
-            return [...leftColumn, ...rightColumn, ...singleList];
-        } else {
-            return singleList;
+        // Teken huidig actief kader tijdens slepen
+        if (isDrawing) {
+            ctx.strokeStyle = '#10B981';
+            ctx.lineWidth = 2;
+            const w = currentX - startX;
+            const h = currentY - startY;
+            ctx.strokeRect(startX, startY, w, h);
         }
     }
 
-    function cleanWord(w) {
-        return w.replace(/[^a-zA-ZáéíóúäëïöüÅå📑-]/g, "").trim();
+    // Muis & Touch Events voor Canvas
+    function getCanvasCoordinates(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
     }
 
-    // 3. Start Oefening
-    document.getElementById('start-practice-btn').addEventListener('click', () => {
-        const rawText = wordsInput.value.trim();
-        if (!rawText) {
-            alert("Voer ten minste één woord in.");
+    function handleStart(e) {
+        isDrawing = true;
+        const pos = getCanvasCoordinates(e);
+        startX = pos.x;
+        startY = pos.y;
+        currentX = pos.x;
+        currentY = pos.y;
+    }
+
+    function handleMove(e) {
+        if (!isDrawing) return;
+        const pos = getCanvasCoordinates(e);
+        currentX = pos.x;
+        currentY = pos.y;
+        redrawCanvas();
+    }
+
+    function handleEnd() {
+        if (!isDrawing) return;
+        isDrawing = false;
+
+        let w = currentX - startX;
+        let h = currentY - startY;
+        let x = startX;
+        let y = startY;
+
+        if (w < 0) { x = currentX; w = Math.abs(w); }
+        if (h < 0) { y = currentY; h = Math.abs(h); }
+
+        // Sla enkel op als de doos groot genoeg is
+        if (w > 20 && h > 20) {
+            boxes.push({ x, y, w, h });
+        }
+        redrawCanvas();
+    }
+
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+
+    canvas.addEventListener('touchstart', (e) => { handleStart(e); e.preventDefault(); });
+    canvas.addEventListener('touchmove', (e) => { handleMove(e); e.preventDefault(); });
+    canvas.addEventListener('touchend', handleEnd);
+
+    document.getElementById('clear-boxes-btn').addEventListener('click', () => {
+        boxes = [];
+        redrawCanvas();
+    });
+
+    // 3. OCR OP ELK GESELECTEERD VAK
+    document.getElementById('process-boxes-btn').addEventListener('click', async () => {
+        if (boxes.length === 0) {
+            alert("Trek eerst minstens één kader rond een woordrijtje op de foto.");
             return;
         }
+
+        canvasContainer.style.display = 'none';
+        drawControls.style.display = 'none';
+        ocrLoader.style.display = 'block';
+
+        let allRecognizedWords = [];
+
+        const scaleX = loadedImage.width / canvas.width;
+        const scaleY = loadedImage.height / canvas.height;
+
+        // Verwerk elk vak in volgorde (Vak 1, Vak 2, ...)
+        for (let i = 0; i < boxes.length; i++) {
+            const box = boxes[i];
+            
+            // Maak tijdelijk off-screen canvas voor het uitgesneden vak
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            const realX = box.x * scaleX;
+            const realY = box.y * scaleY;
+            const realW = box.w * scaleX;
+            const realH = box.h * scaleY;
+
+            tempCanvas.width = realW;
+            tempCanvas.height = realH;
+
+            tempCtx.drawImage(loadedImage, realX, realY, realW, realH, 0, 0, realW, realH);
+
+            try {
+                const result = await Tesseract.recognize(tempCanvas, 'nld');
+                const rawText = result.data.text;
+                const lines = rawText.split('\n');
+
+                lines.forEach(line => {
+                    const clean = line.replace(/[^a-zA-ZáéíóúäëïöüÅå-]/g, "").trim();
+                    if (clean.length > 0) {
+                        allRecognizedWords.push(clean);
+                    }
+                });
+            } catch (err) {
+                console.error("OCR fout in vak " + (i + 1), err);
+            }
+        }
+
+        ocrLoader.style.display = 'none';
+        wordsInput.value = allRecognizedWords.join('\n');
+        switchStep('step-review');
+    });
+
+    // 4. SPRAAKHERKENNING (DOOR MODUS)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'nl-BE';
+        recognition.interimResults = false;
+
+        recognition.onresult = (event) => {
+            const spokenWord = event.results[0][0].transcript.toLowerCase().trim();
+            evaluateSpeech(spokenWord);
+        };
+
+        recognition.onerror = () => {
+            showPictoFeedback('👂');
+            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+        };
+    }
+
+    // Evaluatie met PICTO'S en GESPROKEN feedback
+    function evaluateSpeech(spoken) {
+        const target = wordList[currentIndex].toLowerCase().trim();
+        
+        if (spoken === target) {
+            errorCount = 0;
+            showPictoFeedback('🌟');
+            triggerRandomAnimation();
+            
+            setTimeout(() => {
+                if (currentMode === 3) {
+                    if (currentIndex < wordList.length - 1) {
+                        nextWord(true);
+                    } else {
+                        showCompletionView();
+                    }
+                }
+            }, 1200);
+        } else {
+            errorCount++;
+            
+            if (errorCount >= 2) {
+                // 2x Fout: Toon hulp-picto, spreek woord uit, ga DAARNA automatisch door
+                showPictoFeedback('💡');
+                
+                speakText(wordList[currentIndex], () => {
+                    setTimeout(() => {
+                        if (currentIndex < wordList.length - 1) {
+                            nextWord(true);
+                        } else {
+                            showCompletionView();
+                        }
+                    }, 600);
+                });
+                errorCount = 0;
+            } else {
+                // 1x Fout: Enkel gesproken feedback, géén geschreven tekst
+                showPictoFeedback('👂');
+                speakText("Bijna! Probeer nog eens.", () => {
+                    document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+                });
+            }
+        }
+    }
+
+    // 5. STAP & MODUS NAVIGATIE
+    document.getElementById('start-practice-btn').addEventListener('click', () => {
+        const rawText = wordsInput.value.trim();
+        if (!rawText) return;
         wordList = rawText.split('\n').map(w => w.trim()).filter(w => w.length > 0);
         currentIndex = 0;
         switchStep('step-practice');
@@ -568,26 +704,21 @@
 
         const fullListView = document.getElementById('full-list-view');
         const singleWordView = document.getElementById('single-word-view');
+        const speedControl = document.getElementById('speed-control-box');
         const playListBtn = document.getElementById('play-list-btn');
-        document.getElementById('countdown-banner').innerText = '';
 
-        hideFeedback();
+        showPictoFeedback('');
 
-        if (mode === 1) {
+        if (mode === 1 || mode === 2) {
             fullListView.style.display = 'block';
             singleWordView.style.display = 'none';
-            playListBtn.innerText = "🔊 Beluister het hele rijtje";
-            playListBtn.className = "btn";
-        } 
-        else if (mode === 2) {
-            fullListView.style.display = 'block';
-            singleWordView.style.display = 'none';
-            playListBtn.innerText = "🗣️ Lees samen het hele rijtje";
-            playListBtn.className = "btn";
+            speedControl.style.display = 'flex';
+            playListBtn.innerText = mode === 1 ? "🔊 Beluister het rijtje" : "🗣️ Nu samen lezen";
         } 
         else if (mode === 3) {
             fullListView.style.display = 'none';
             singleWordView.style.display = 'block';
+            speedControl.style.display = 'none';
             currentIndex = 0;
             errorCount = 0;
             updateSingleWordUI();
@@ -601,7 +732,7 @@
         }
 
         if (currentMode === 1) {
-            readFullListSequentially(0.55, 600);
+            readFullListSequentially();
         } else if (currentMode === 2) {
             const banner = document.getElementById('countdown-banner');
             let count = 3;
@@ -614,18 +745,18 @@
                 } else {
                     clearInterval(timer);
                     banner.innerText = "🗣️ Nu samen lezen!";
-                    readFullListSequentially(0.60, 700);
+                    readFullListSequentially();
                 }
-            }, 900);
+            }, 800);
         }
     }
 
-    function readFullListSequentially(rate = 0.55, pauseMs = 600) {
+    function readFullListSequentially() {
         stopSpeechAndTimers();
         isPlayingList = true;
 
         const playBtn = document.getElementById('play-list-btn');
-        playBtn.innerText = "⏹️ Stop voorlezen";
+        playBtn.innerText = "⏹️ Stop";
         playBtn.className = "btn btn-secondary";
 
         let index = 0;
@@ -633,7 +764,7 @@
         function speakNext() {
             if (index >= wordList.length || !isPlayingList) {
                 stopSpeechAndTimers();
-                showFeedback("🎉 Rijtje voltooid!", 'success');
+                showPictoFeedback('🌟');
                 triggerRandomAnimation();
                 return;
             }
@@ -642,9 +773,9 @@
             const badge = document.getElementById(`badge-${index}`);
             if (badge) badge.classList.add('active-word');
 
-            speakText(wordList[index], rate, () => {
+            speakText(wordList[index], () => {
                 index++;
-                setTimeout(speakNext, pauseMs);
+                setTimeout(speakNext, 500);
             });
         }
 
@@ -659,134 +790,50 @@
         isPlayingList = false;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         clearWordHighlights();
+        document.getElementById('countdown-banner').innerText = '';
         
         const playBtn = document.getElementById('play-list-btn');
         if (playBtn) {
             playBtn.className = "btn";
-            if (currentMode === 1) playBtn.innerText = "🔊 Beluister het hele rijtje";
-            else if (currentMode === 2) playBtn.innerText = "🗣️ Lees samen het hele rijtje";
+            playBtn.innerText = currentMode === 1 ? "🔊 Beluister het rijtje" : "🗣️ Nu samen lezen";
         }
     }
 
-    // DOOR (Per woord lezen)
     function updateSingleWordUI() {
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
         document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-        hideFeedback();
+        showPictoFeedback('');
     }
 
     function startListening() {
-        hideFeedback();
+        showPictoFeedback('');
         if (!recognition) {
             alert("Spraakherkenning wordt niet ondersteund op deze browser.");
             return;
         }
         document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
-        try {
-            recognition.start();
-        } catch(e) {
-            recognition.stop();
-            recognition.start();
-        }
+        try { recognition.start(); } catch(e) { recognition.stop(); recognition.start(); }
     }
 
-    // Evaluatie spraak + hardop voorgelezen feedback + auto-doorstappen na hulp
-    function evaluateSpeech(spoken) {
-        const target = wordList[currentIndex].toLowerCase().trim();
-        const spokenClean = spoken.toLowerCase().trim();
-        
-        if (spokenClean === target) {
-            errorCount = 0;
-            showFeedback(` Perfect gelezen!`, 'success');
-            triggerRandomAnimation();
-            
-            setTimeout(() => {
-                if (currentMode === 3) {
-                    if (currentIndex < wordList.length - 1) {
-                        nextWord(true); // Automatisch naar volgende + direct luisteren
-                    } else {
-                        showCompletionView();
-                    }
-                }
-            }, 1500);
-        } else {
-            errorCount++;
-            
-            if (errorCount >= 2) {
-                // 2x fout: Lees het juiste woord voor en ga DAARNA automatisch door naar het volgende woord
-                showFeedback(`💡 Luister goed: "${wordList[currentIndex]}"`, 'error');
-                
-                speakText(wordList[currentIndex], 0.5, () => {
-                    setTimeout(() => {
-                        if (currentIndex < wordList.length - 1) {
-                            nextWord(true); // Automatisch naar volgend woord!
-                        } else {
-                            showCompletionView();
-                        }
-                    }, 600);
-                });
-                errorCount = 0;
-            } else {
-                // 1x fout: Lees de feedback tekst voor
-                const feedbackText = `Bijna! We hoorden ${spokenClean}. Probeer nog eens!`;
-                showFeedback(`❌ ${feedbackText}`, 'error');
-                
-                speakText(`Bijna! We hoorden ${spokenClean}. Probeer nog eens!`, 0.75, () => {
-                    document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-                });
-            }
-        }
-    }
-
-    function showCompletionView() {
-        stopSpeechAndTimers();
-        switchStep('step-finished');
-        
-        confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
-        setTimeout(() => {
-            confetti({ particleCount: 100, angle: 60, spread: 55, origin: { x: 0 } });
-            confetti({ particleCount: 100, angle: 120, spread: 55, origin: { x: 1 } });
-        }, 400);
+    function showPictoFeedback(emoji) {
+        document.getElementById('picto-feedback').innerText = emoji;
     }
 
     function triggerRandomAnimation() {
-        const choice = Math.floor(Math.random() * 5);
-
-        if (choice === 0) {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        } 
-        else if (choice === 1) {
-            confetti({
-                particleCount: 80,
-                spread: 100,
-                origin: { y: 0.6 },
-                shapes: ['star'],
-                colors: ['#FFE100', '#FFBD00', '#E80054']
-            });
-        } 
-        else if (choice === 2) {
-            confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0, y: 0.7 } });
-            confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1, y: 0.7 } });
-        } 
-        else if (choice === 3) {
-            showOverlayEmoji('👍', 'thumbs-up-anim');
-        } 
-        else if (choice === 4) {
-            showOverlayEmoji('🎉 👏', 'floating-emoji');
-        }
+        const choice = Math.floor(Math.random() * 3);
+        if (choice === 0) confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        else if (choice === 1) showOverlayEmoji('👍');
+        else if (choice === 2) showOverlayEmoji('🌟');
     }
 
-    function showOverlayEmoji(emoji, cssClass) {
+    function showOverlayEmoji(emoji) {
         const container = document.getElementById('anim-container');
         const el = document.createElement('div');
-        el.className = cssClass;
+        el.className = 'thumbs-up-anim';
         el.innerText = emoji;
         container.appendChild(el);
-
-        setTimeout(() => {
-            el.remove();
-        }, 1500);
+        setTimeout(() => el.remove(), 1200);
     }
 
     function nextWord(autoListen = false) {
@@ -794,9 +841,7 @@
             currentIndex++;
             errorCount = 0;
             updateSingleWordUI();
-            if (autoListen) {
-                setTimeout(() => startListening(), 400);
-            }
+            if (autoListen) setTimeout(() => startListening(), 400);
         }
     }
 
@@ -808,16 +853,10 @@
         }
     }
 
-    function showFeedback(msg, type) {
-        const fb = document.getElementById('feedback');
-        fb.innerText = msg;
-        fb.className = `feedback-box ${type}`;
-    }
-
-    function hideFeedback() {
-        const fb = document.getElementById('feedback');
-        fb.className = 'feedback-box';
-        fb.innerText = '';
+    function showCompletionView() {
+        stopSpeechAndTimers();
+        switchStep('step-finished');
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
     }
 
     function switchStep(stepId) {
@@ -830,7 +869,6 @@
         location.reload();
     }
 
-    // Zorg dat beschikbare stemmen geladen zijn
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
     }
