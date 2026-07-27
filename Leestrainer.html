@@ -195,6 +195,7 @@
         .word-badge {
             background: #FFFFFF; border: 1px solid #CBD5E1; padding: 12px 20px; border-radius: 12px;
             font-size: 1.4rem; font-weight: 600; color: #334155; transition: all 0.2s ease; width: 85%; text-align: center; box-sizing: border-box;
+            scroll-margin: 60px; /* Zorgt voor een fijne marge bij het automatisch scrollen */
         }
         .word-badge.active-word {
             background-color: var(--highlight); border-color: #EAB308; transform: scale(1.05); color: #854D0E;
@@ -413,6 +414,31 @@
     let correctCount = 0;
     let currentWordFailed = false;
     let currentStepId = 'step-upload';
+
+    /* SCREEN WAKE LOCK (Voorkom dat het scherm dimt of uitvalt) */
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.log('Wake Lock mislukt:', err);
+            }
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock !== null) {
+            wakeLock.release().catch(() => {}).then(() => { wakeLock = null; });
+        }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            await requestWakeLock();
+        }
+    });
 
     const cameraInput = document.getElementById('camera-input');
     const canvasContainer = document.getElementById('canvas-container');
@@ -861,10 +887,8 @@
                 if (!isProcessingSpeech && currentMode === 3) {
                     if (!hasMatchedInSession) {
                         if (hasReceivedSpeech) {
-                            // Gesproken, maar het was fout
                             handleSpeechError();
                         } else {
-                            // Niks gehoord -> als we in auto-listen modus zitten, luister opnieuw
                             if (isAutoListening) {
                                 showPictoFeedback("👂 Ik luister...", false);
                                 setTimeout(() => {
@@ -894,7 +918,7 @@
         isProcessingSpeech = false;
         hasMatchedInSession = false;
         hasReceivedSpeech = false;
-        isAutoListening = true; // Zodra gestart, geactiveerd voor automatisch vervolg
+        isAutoListening = true;
 
         if (!recognition) {
             showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel. Je kan ook zonder microfoon oefenen:");
@@ -994,7 +1018,6 @@
         }, 600);
     }
 
-    /* AANGEPASTE FOUTAFHANDELING VOOR DOOR-LEZEN */
     function handleSpeechError() {
         isProcessingSpeech = true;
         currentWordFailed = true;
@@ -1007,7 +1030,6 @@
         const currentWord = wordList[currentIndex];
 
         if (currentWordErrorCount === 1) {
-            // 1e keer fout: toont rood kruis en leest auditief "Probeer nog eens" voor
             showPictoFeedback(`❌ Probeer nog eens!`, true);
             speakText("Probeer nog eens.", () => {
                 setTimeout(() => {
@@ -1018,7 +1040,6 @@
                 }, 300);
             });
         } else {
-            // 2e keer fout: toont rood kruis, leest het juiste woord voor en gaat naar volgend woord
             showPictoFeedback(`❌ Het juiste woord is: "${currentWord}"`, true);
             speakText(currentWord, () => {
                 setTimeout(() => {
@@ -1041,6 +1062,7 @@
         currentIndex = 0;
         correctCount = 0;
         switchStep('step-practice');
+        requestWakeLock(); // Scherm actief houden bij het starten van de oefening
         renderFullList();
         setMode(1);
     });
@@ -1147,7 +1169,11 @@
 
             clearWordHighlights();
             const badge = document.getElementById(`badge-${index}`);
-            if (badge) badge.classList.add('active-word');
+            if (badge) {
+                badge.classList.add('active-word');
+                // Automatisch meescrollen naar het actieve woord
+                badge.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
 
             speakText(wordList[index], () => {
                 if (!isPlayingList) return;
@@ -1186,14 +1212,13 @@
 
     function updateSingleWordUI() {
         currentWordFailed = false;
-        currentWordErrorCount = 0; // Reset foutenaantal per nieuw woord
+        currentWordErrorCount = 0;
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
         showPictoFeedback('', false);
 
         if (isAutoListening) {
             document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
-            // Luister automatisch na een korte pauze zodat de leerling het woord kan zien
             setTimeout(() => {
                 if (currentMode === 3 && isAutoListening && !isProcessingSpeech) {
                     startListening();
@@ -1241,6 +1266,7 @@
 
     function showCompletionView() {
         stopSpeechAndTimers();
+        releaseWakeLock(); // Vrijgeven bij het afronden
 
         const scoreElem = document.getElementById('score-display');
         if (currentMode === 3) {
@@ -1258,6 +1284,12 @@
         document.querySelectorAll('.step-panel').forEach(panel => panel.classList.remove('active'));
         document.getElementById(stepId).classList.add('active');
         currentStepId = stepId;
+
+        if (stepId === 'step-practice') {
+            requestWakeLock();
+        } else {
+            releaseWakeLock();
+        }
     }
 
     function resetApp() {
@@ -1266,6 +1298,7 @@
             if (!ok) return;
         }
         stopSpeechAndTimers();
+        releaseWakeLock();
         location.reload();
     }
 </script>
