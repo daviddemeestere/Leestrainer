@@ -84,13 +84,14 @@
             border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: var(--primary);
         }
 
+        /* MET SCROLLBARS VOOR OPSCHUIVEN BIJ INZOOMEN */
         .canvas-container {
             position: relative; width: 100%; max-height: 60vh; margin: 10px 0;
-            background: #000; border-radius: 12px; overflow: auto; display: none;
-            -webkit-overflow-scrolling: touch;
+            background: #1E293B; border-radius: 12px; overflow: auto; display: none;
+            -webkit-overflow-scrolling: touch; border: 2px solid #CBD5E1;
         }
 
-        canvas { display: block; cursor: crosshair; touch-action: none; }
+        canvas { display: block; cursor: crosshair; touch-action: auto; }
 
         textarea {
             width: 100%; height: 140px; border: 1px solid #D1D5DB;
@@ -116,20 +117,13 @@
             min-height: 150px; overflow: hidden;
         }
 
-        /* 3-2-1 AFTELLER BOVENAAN UITGELIJND */
         .countdown-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(255, 255, 255, 0.94);
-            display: flex;
-            justify-content: center;
-            align-items: flex-start; /* BOVENAAN GEPLAATST */
-            padding-top: 25px;       /* VASTE AFSTAND VAN BOVEN */
-            font-size: 6rem;
-            font-weight: 900;
-            color: var(--primary);
-            z-index: 20;
-            border-radius: 16px;
+            display: flex; justify-content: center; align-items: flex-start;
+            padding-top: 25px; font-size: 6rem; font-weight: 900; color: var(--primary);
+            z-index: 20; border-radius: 16px;
             animation: pulseCount 0.7s infinite alternate ease-in-out;
         }
 
@@ -166,7 +160,6 @@
         .thumbs-up-anim { font-size: 7rem; animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes bounceIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
 
-        /* SHAKE ANIMATIE BIJ FOUT LEZEN */
         .shake { animation: shake 0.4s ease-in-out; }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -193,9 +186,9 @@
         <div id="draw-controls" style="display:none;">
             <div class="zoom-bar">
                 <span>🔍 Zoom:</span>
-                <button class="zoom-btn" onclick="adjustZoom(0.25)">➕ In</button>
-                <button class="zoom-btn" onclick="adjustZoom(-0.25)">➖ Uit</button>
-                <button class="zoom-btn" onclick="resetZoom()">🔄 100%</button>
+                <button class="zoom-btn" onclick="adjustZoom(0.3)">➕ In</button>
+                <button class="zoom-btn" onclick="adjustZoom(-0.3)">➖ Uit</button>
+                <button class="zoom-btn" onclick="resetZoom()">🔄 Herstel</button>
             </div>
 
             <div class="canvas-container" id="canvas-container">
@@ -203,7 +196,7 @@
             </div>
 
             <p style="text-align:center; font-size: 0.85rem; color: #4B5563; margin: 5px 0 10px 0;">
-                👉 Trek een kader. Versleep bolletjes om aan te passen.
+                👉 Trek een kader. Sleep bolletjes aan. Veeg/scroll om te bewegen bij inzoomen.
             </p>
             
             <button id="process-boxes-btn" class="btn">✂️ Herken Tekst Uit Vakken</button>
@@ -238,13 +231,11 @@
             <span class="speed-icon">🐇</span>
         </div>
 
-        <!-- VOOR & KOOR LEZEN: KNOP STAAT NU BOVENAAN! -->
         <div id="full-list-view">
             <button id="play-list-btn" class="btn" onclick="handleFullListAction()">🔊 Beluister het rijtje</button>
             <div class="full-list-card" id="full-list-container"></div>
         </div>
 
-        <!-- DOOR LEZEN (INDIVIDUEEL) -->
         <div id="single-word-view" style="display:none;">
             <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-bottom: 5px;">
                 <span id="progress-text">Woord 1 van 5</span>
@@ -292,7 +283,6 @@
     let currentMode = 1;
     let recognition = null;
     let isPlayingList = false;
-    let errorCount = 0;
     let isProcessingSpeech = false;
     let hasMatchedInSession = false;
 
@@ -353,7 +343,7 @@
     }
 
     function adjustZoom(delta) {
-        zoomLevel = Math.max(0.75, Math.min(2.5, zoomLevel + delta));
+        zoomLevel = Math.max(1.0, Math.min(3.0, zoomLevel + delta));
         applyZoomStyle();
     }
 
@@ -364,7 +354,10 @@
 
     function applyZoomStyle() {
         const containerWidth = canvasContainer.clientWidth || 460;
+        const baseHeight = (loadedImage.height * (containerWidth / loadedImage.width));
+        
         canvas.style.width = (containerWidth * zoomLevel) + 'px';
+        canvas.style.height = (baseHeight * zoomLevel) + 'px';
     }
 
     function redrawCanvas() {
@@ -505,13 +498,25 @@
     canvas.addEventListener('mousedown', handleStart);
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
-    canvas.addEventListener('touchstart', (e) => { handleStart(e); e.preventDefault(); });
-    canvas.addEventListener('touchmove', (e) => { handleMove(e); e.preventDefault(); });
+
+    // VRIJ TOUCH SCROLLEN WANNEER ER NIET VERLEEP/GETEKEND WORDT
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length > 1) return; // scrollen toestaan
+        handleStart(e);
+    });
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length > 1) return;
+        if (isDrawing || dragState) {
+            e.preventDefault(); // Voorkom scrollen alleen als je tekent
+        }
+        handleMove(e);
+    }, { passive: false });
     canvas.addEventListener('touchend', handleEnd);
 
     document.getElementById('undo-box-btn').addEventListener('click', () => { boxes.pop(); redrawCanvas(); });
     document.getElementById('clear-boxes-btn').addEventListener('click', () => { boxes = []; redrawCanvas(); });
 
+    /* OCR OPSCHONING (HOOFDLETTER REGELING) */
     document.getElementById('process-boxes-btn').addEventListener('click', async () => {
         if (boxes.length === 0) return alert("Trek eerst een kader rond een rijtje.");
         canvasContainer.style.display = 'none'; drawControls.style.display = 'none'; ocrLoader.style.display = 'block';
@@ -530,8 +535,22 @@
             try {
                 const result = await Tesseract.recognize(tempCanvas, 'nld');
                 result.data.text.split('\n').forEach(line => {
-                    const clean = line.replace(/[^a-zA-ZáéíóúäëïöüÅå-]/g, "").trim();
-                    if (clean.length > 0) allRecognizedWords.push(clean);
+                    let clean = line.replace(/[^a-zA-ZáéíóúäëïöüÅå-]/g, "").trim();
+                    if (clean.length > 0) {
+                        
+                        // REGEL VOOR HOOFDLETTERS (Bijv. "MUUr" -> "muur", "Jan" -> "Jan")
+                        let formattedWord;
+                        // Check of het precies 1 Hoofdletter heeft aan het begin (bijv. "Jan" of "Maan")
+                        const isProperNounFormat = /^[A-ZÁÉÍÓÚÄËÏÖÜ][a-záéíóúäëïöü-]+$/.test(clean);
+                        
+                        if (isProperNounFormat) {
+                            formattedWord = clean; // Eigennaam behouden
+                        } else {
+                            formattedWord = clean.toLowerCase(); // Alles omzetten naar kleine letters ("MUUr" -> "muur")
+                        }
+
+                        allRecognizedWords.push(formattedWord);
+                    }
                 });
             } catch (err) { console.error(err); }
         }
@@ -541,15 +560,13 @@
         switchStep('step-review');
     });
 
-    // -------------------------------------------------------------
-    // SLIMME & VERBETERDE SPRAAKHERKENNING
-    // -------------------------------------------------------------
+    /* SPRAAKHERKENNING MET DIRECTE AUTOMATISCHE DOORSTREAMING BIJ FOUT */
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'nl-BE';
-        recognition.continuous = false;      // Luister per poging
-        recognition.interimResults = true;  // Directe feedback bij match
+        recognition.continuous = false;
+        recognition.interimResults = true;
         recognition.maxAlternatives = 3;
 
         recognition.onresult = (event) => {
@@ -574,8 +591,6 @@
 
         recognition.onend = () => {
             document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-            
-            // Als er geen succesvolle match was toen het spreken stopte -> FOUT FEEDBACK
             if (!hasMatchedInSession && !isProcessingSpeech) {
                 handleSpeechError();
             }
@@ -588,14 +603,10 @@
         };
     }
 
-    // AANGEPASTE STRENGERE MATCHING (Minder vergevingsgezind)
     function isFuzzyMatch(spoken, target) {
-        // 1. Korte woorden (≤ 4 letters): EXACTE MATCH VERREST!
         if (target.length <= 4) {
             return spoken === target;
         }
-
-        // 2. Langere woorden: Minstens 85% gelijkenis vereist
         const dist = levenshtein(spoken, target);
         const similarity = 1 - (dist / Math.max(spoken.length, target.length));
         return similarity >= 0.85;
@@ -620,7 +631,6 @@
     }
 
     function evaluateSpeechSuccess() {
-        errorCount = 0;
         showPictoFeedback('🌟 Goed zo!', false);
         triggerRandomAnimation();
 
@@ -636,21 +646,28 @@
         }, 400);
     }
 
+    /* FOUTAFHANDELING: JUISTE WOORD ZEGGEN & AUTOMATISCH NAAR VOLGENDE WOORD */
     function handleSpeechError() {
-        errorCount++;
+        isProcessingSpeech = true;
         const card = document.getElementById('target-word');
         card.classList.add('shake');
         setTimeout(() => card.classList.remove('shake'), 400);
 
-        if (errorCount >= 2) {
-            // Na 2 fouten: Spreek het woord voor als hulp
-            showPictoFeedback('💡 Luister goed...', true);
-            speakText(wordList[currentIndex], () => {
-                showPictoFeedback('❌ Probeer het nog eens!', true);
-            });
-        } else {
-            showPictoFeedback('❌ Oeps! Probeer het nog eens.', true);
-        }
+        const currentWord = wordList[currentIndex];
+        showPictoFeedback(`❌ Luister: "${currentWord}"`, true);
+
+        // App spreekt het juiste woord direct voor
+        speakText(currentWord, () => {
+            setTimeout(() => {
+                isProcessingSpeech = false;
+                // Direct automatisch door naar het volgende woord
+                if (currentIndex < wordList.length - 1) {
+                    nextWord(true);
+                } else {
+                    showCompletionView();
+                }
+            }, 600);
+        });
     }
 
     function startListening() {
@@ -664,7 +681,7 @@
         try { recognition.start(); } catch(e) { recognition.stop(); recognition.start(); }
     }
 
-    /* OEFENMODI & KOORLEZEN AFTELLER */
+    /* OEFENMODI & KOORLEZEN */
     document.getElementById('start-practice-btn').addEventListener('click', () => {
         const rawText = wordsInput.value.trim();
         if (!rawText) return;
@@ -709,7 +726,7 @@
             fullListView.style.display = 'none';
             singleWordView.style.display = 'block';
             speedControl.style.display = 'none';
-            currentIndex = 0; errorCount = 0;
+            currentIndex = 0;
             updateSingleWordUI();
         }
     }
@@ -829,7 +846,7 @@
 
     function nextWord(autoListen = false) {
         if (currentIndex < wordList.length - 1) {
-            currentIndex++; errorCount = 0;
+            currentIndex++;
             updateSingleWordUI();
             if (autoListen) setTimeout(() => startListening(), 200);
         }
@@ -837,7 +854,7 @@
 
     function prevWord() {
         if (currentIndex > 0) {
-            currentIndex--; errorCount = 0;
+            currentIndex--;
             updateSingleWordUI();
         }
     }
