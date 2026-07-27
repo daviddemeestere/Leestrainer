@@ -94,11 +94,10 @@
 
         .btn-secondary { background-color: #6B7280; }
         .btn-outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
-        .btn-danger { background-color: #DC2626; }
 
         input[type="file"] { display: none; }
 
-        /* CANVAS WAAROP JE RECHTHOEKEN KUNT TEKENEN */
+        /* CANVAS WAAROP JE RECHTHOEKEN KUNT TEKENEN EN AANPASSEN */
         .canvas-container {
             position: relative;
             width: 100%;
@@ -113,7 +112,7 @@
             display: block;
             width: 100%;
             cursor: crosshair;
-            touch-action: none; /* Prevent scrolling during draw */
+            touch-action: none; /* Voorkomt scrollen tijdens tekenen en verslepen */
         }
 
         textarea {
@@ -164,13 +163,6 @@
             gap: 10px;
         }
 
-        .speed-control label {
-            font-weight: bold;
-            font-size: 0.95rem;
-            color: var(--primary);
-            white-space: nowrap;
-        }
-
         .speed-slider {
             flex: 1;
             height: 8px;
@@ -179,9 +171,7 @@
             accent-color: var(--primary);
         }
 
-        .speed-icon {
-            font-size: 1.3rem;
-        }
+        .speed-icon { font-size: 1.3rem; }
 
         /* VERTIKALE WOORDENLIJST */
         .full-list-card {
@@ -232,7 +222,7 @@
             color: #312E81;
         }
 
-        /* FEEDBACK MET PICTO'S (GEEN TEKST DUS) */
+        /* FEEDBACK MET PICTO'S */
         .picto-feedback {
             text-align: center;
             font-size: 4rem;
@@ -302,7 +292,7 @@
         <button class="btn-home" onclick="resetApp()">🏠 Home</button>
     </div>
 
-    <!-- STAP 1: FOTO MAKEN & RECHTHOEKEN TEKENEN -->
+    <!-- STAP 1: FOTO MAKEN & VAKKEN TEKENEN/AANPASSEN -->
     <div id="step-upload" class="step-panel active">
         <label for="camera-input" class="btn">📸 Foto Maken / Kiezen</label>
         <input type="file" id="camera-input" accept="image/*" capture="environment">
@@ -312,11 +302,12 @@
         </div>
 
         <div id="draw-controls" style="display:none;">
-            <p style="text-align:center; font-size: 0.95rem; color: #4B5563; margin: 5px 0 10px 0;">
-                👉 <strong>Trek een kader</strong> rond elk woordrijtje op de foto.
+            <p style="text-align:center; font-size: 0.9rem; color: #4B5563; margin: 5px 0 10px 0;">
+                👉 <strong>Trek een kader</strong> rond een rijtje.<br>
+                ✨ <strong>Versleep de bolletjes of zijden</strong> om het kader precies passend te maken.
             </p>
             <button id="process-boxes-btn" class="btn">✂️ Herken Tekst Uit Vakken</button>
-            <button id="clear-boxes-btn" class="btn btn-secondary" style="margin-top: 5px;">🗑️ Wis Vakken</button>
+            <button id="clear-boxes-btn" class="btn btn-secondary" style="margin-top: 5px;">🗑️ Wis Alle Vakken</button>
         </div>
 
         <div id="ocr-loader" class="loader">⏳ Tekst wordt herkend...</div>
@@ -367,7 +358,7 @@
             </div>
         </div>
 
-        <!-- VISUELE PICTO FEEDBACK (GEEN LEESTEKST) -->
+        <!-- VISUELE PICTO FEEDBACK -->
         <div id="picto-feedback" class="picto-feedback"></div>
     </div>
 
@@ -389,18 +380,21 @@
     let loadedImage = null;
     let canvas = document.getElementById('image-canvas');
     let ctx = canvas.getContext('2d');
-    let boxes = []; // Bewaart de getekende kaders [{x, y, w, h}]
+    
+    let boxes = []; // [{x, y, w, h}]
     let isDrawing = false;
+    let dragState = null; // { boxIndex, handle, startPos, initialBox }
     let startX, startY, currentX, currentY;
+
+    const HANDLE_RADIUS = 16; // Aanraakgevoelige zone rondom de bolletjes/zijden
 
     let wordList = [];
     let currentIndex = 0;
     let currentMode = 1;
     let recognition = null;
     let isPlayingList = false;
-    errorCount = 0;
+    let errorCount = 0;
 
-    // DOM ELEMENTEN
     const cameraInput = document.getElementById('camera-input');
     const canvasContainer = document.getElementById('canvas-container');
     const drawControls = document.getElementById('draw-controls');
@@ -413,14 +407,11 @@
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Snelheid ophalen uit de schuifknop
         const speedVal = parseFloat(document.getElementById('speed-slider').value);
         utterance.rate = speedVal;
         utterance.lang = 'nl-BE';
 
         const voices = window.speechSynthesis.getVoices();
-        // Zoek Vlaamse stem
         const flemishVoice = voices.find(v => 
             v.lang === 'nl-BE' || 
             v.lang.includes('BE') || 
@@ -433,7 +424,7 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    // 2. CANVAS INTERACTIE: RECHTHOEKEN TEKENEN
+    // 2. CANVAS INTERACTIE: TEKENS, BIJSNIJDEN & AANPASSEN
     cameraInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -466,24 +457,28 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
 
-        // Teken alle opgeslagen kaders
+        // Teken alle kaders
         boxes.forEach((box, index) => {
+            // Rechthoek
             ctx.strokeStyle = '#4F46E5';
             ctx.lineWidth = 3;
             ctx.strokeRect(box.x, box.y, box.w, box.h);
 
-            ctx.fillStyle = 'rgba(79, 70, 229, 0.2)';
+            ctx.fillStyle = 'rgba(79, 70, 229, 0.15)';
             ctx.fillRect(box.x, box.y, box.w, box.h);
 
             // Nummer van het vak
             ctx.fillStyle = '#4F46E5';
             ctx.fillRect(box.x, box.y, 26, 26);
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 16px sans-serif';
-            ctx.fillText((index + 1).toString(), box.x + 8, box.y + 19);
+            ctx.font = 'bold 15px sans-serif';
+            ctx.fillText((index + 1).toString(), box.x + 8, box.y + 18);
+
+            // Teken 8 Aanrijpingspunten (bolletjes) op hoeken & zijden
+            drawHandles(box);
         });
 
-        // Teken huidig actief kader tijdens slepen
+        // Teken het vak dat momenteel getekend wordt
         if (isDrawing) {
             ctx.strokeStyle = '#10B981';
             ctx.lineWidth = 2;
@@ -493,7 +488,63 @@
         }
     }
 
-    // Muis & Touch Events voor Canvas
+    function drawHandles(box) {
+        const { x, y, w, h } = box;
+        const handles = [
+            { x: x, y: y },                 // nw
+            { x: x + w / 2, y: y },         // n
+            { x: x + w, y: y },             // ne
+            { x: x + w, y: y + h / 2 },     // e
+            { x: x + w, y: y + h },         // se
+            { x: x + w / 2, y: y + h },     // s
+            { x: x, y: y + h },             // sw
+            { x: x, y: y + h / 2 }          // w
+        ];
+
+        handles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 7, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#4F46E5';
+            ctx.stroke();
+        });
+    }
+
+    // Controleer of de gebruiker op een bolletje, zijde of in een vak tikt
+    function getHandleAt(pos) {
+        for (let i = boxes.length - 1; i >= 0; i--) {
+            const b = boxes[i];
+            const { x, y, w, h } = b;
+
+            const handles = [
+                { name: 'nw', x: x, y: y },
+                { name: 'ne', x: x + w, y: y },
+                { name: 'sw', x: x, y: y + h },
+                { name: 'se', x: x + w, y: y + h },
+                { name: 'n',  x: x + w / 2, y: y },
+                { name: 's',  x: x + w / 2, y: y + h },
+                { name: 'w',  x: x, y: y + h / 2 },
+                { name: 'e',  x: x + w, y: y + h / 2 }
+            ];
+
+            // 1. Controleer bolletjes
+            for (let hnd of handles) {
+                const dist = Math.hypot(pos.x - hnd.x, pos.y - hnd.y);
+                if (dist <= HANDLE_RADIUS) {
+                    return { boxIndex: i, handle: hnd.name };
+                }
+            }
+
+            // 2. Controleer verslepen van het hele vak
+            if (pos.x >= x && pos.x <= x + w && pos.y >= y && pos.y <= y + h) {
+                return { boxIndex: i, handle: 'move' };
+            }
+        }
+        return null;
+    }
+
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -505,39 +556,76 @@
     }
 
     function handleStart(e) {
-        isDrawing = true;
         const pos = getCanvasCoordinates(e);
-        startX = pos.x;
-        startY = pos.y;
-        currentX = pos.x;
-        currentY = pos.y;
+        const hit = getHandleAt(pos);
+
+        if (hit) {
+            dragState = {
+                boxIndex: hit.boxIndex,
+                handle: hit.handle,
+                startPos: pos,
+                initialBox: { ...boxes[hit.boxIndex] }
+            };
+        } else {
+            isDrawing = true;
+            startX = pos.x;
+            startY = pos.y;
+            currentX = pos.x;
+            currentY = pos.y;
+        }
     }
 
     function handleMove(e) {
-        if (!isDrawing) return;
         const pos = getCanvasCoordinates(e);
-        currentX = pos.x;
-        currentY = pos.y;
-        redrawCanvas();
+
+        if (dragState) {
+            const dx = pos.x - dragState.startPos.x;
+            const dy = pos.y - dragState.startPos.y;
+            const b = boxes[dragState.boxIndex];
+            const init = dragState.initialBox;
+
+            switch (dragState.handle) {
+                case 'nw': b.x = init.x + dx; b.w = init.w - dx; b.y = init.y + dy; b.h = init.h - dy; break;
+                case 'ne': b.w = init.w + dx; b.y = init.y + dy; b.h = init.h - dy; break;
+                case 'sw': b.x = init.x + dx; b.w = init.w - dx; b.h = init.h + dy; break;
+                case 'se': b.w = init.w + dx; b.h = init.h + dy; break;
+                case 'n':  b.y = init.y + dy; b.h = init.h - dy; break;
+                case 's':  b.h = init.h + dy; break;
+                case 'w':  b.x = init.x + dx; b.w = init.w - dx; break;
+                case 'e':  b.w = init.w + dx; break;
+                case 'move': b.x = init.x + dx; b.y = init.y + dy; break;
+            }
+            redrawCanvas();
+        } else if (isDrawing) {
+            currentX = pos.x;
+            currentY = pos.y;
+            redrawCanvas();
+        }
     }
 
     function handleEnd() {
-        if (!isDrawing) return;
-        isDrawing = false;
+        if (dragState) {
+            // Zorg ervoor dat breedte/hoogte positief blijven na verslepen
+            const b = boxes[dragState.boxIndex];
+            if (b.w < 0) { b.x += b.w; b.w = Math.abs(b.w); }
+            if (b.h < 0) { b.y += b.h; b.h = Math.abs(b.h); }
+            dragState = null;
+            redrawCanvas();
+        } else if (isDrawing) {
+            isDrawing = false;
+            let w = currentX - startX;
+            let h = currentY - startY;
+            let x = startX;
+            let y = startY;
 
-        let w = currentX - startX;
-        let h = currentY - startY;
-        let x = startX;
-        let y = startY;
+            if (w < 0) { x = currentX; w = Math.abs(w); }
+            if (h < 0) { y = currentY; h = Math.abs(h); }
 
-        if (w < 0) { x = currentX; w = Math.abs(w); }
-        if (h < 0) { y = currentY; h = Math.abs(h); }
-
-        // Sla enkel op als de doos groot genoeg is
-        if (w > 20 && h > 20) {
-            boxes.push({ x, y, w, h });
+            if (w > 20 && h > 20) {
+                boxes.push({ x, y, w, h });
+            }
+            redrawCanvas();
         }
-        redrawCanvas();
     }
 
     canvas.addEventListener('mousedown', handleStart);
@@ -569,11 +657,9 @@
         const scaleX = loadedImage.width / canvas.width;
         const scaleY = loadedImage.height / canvas.height;
 
-        // Verwerk elk vak in volgorde (Vak 1, Vak 2, ...)
         for (let i = 0; i < boxes.length; i++) {
             const box = boxes[i];
             
-            // Maak tijdelijk off-screen canvas voor het uitgesneden vak
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
 
@@ -608,7 +694,7 @@
         switchStep('step-review');
     });
 
-    // 4. SPRAAKHERKENNING (DOOR MODUS)
+    // 4. SPRAAKHERKENNING
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
@@ -626,7 +712,6 @@
         };
     }
 
-    // Evaluatie met PICTO'S en GESPROKEN feedback
     function evaluateSpeech(spoken) {
         const target = wordList[currentIndex].toLowerCase().trim();
         
@@ -648,7 +733,6 @@
             errorCount++;
             
             if (errorCount >= 2) {
-                // 2x Fout: Toon hulp-picto, spreek woord uit, ga DAARNA automatisch door
                 showPictoFeedback('💡');
                 
                 speakText(wordList[currentIndex], () => {
@@ -662,7 +746,6 @@
                 });
                 errorCount = 0;
             } else {
-                // 1x Fout: Enkel gesproken feedback, géén geschreven tekst
                 showPictoFeedback('👂');
                 speakText("Bijna! Probeer nog eens.", () => {
                     document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
