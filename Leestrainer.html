@@ -345,7 +345,7 @@
 
             <div id="speech-warning" class="info-banner"></div>
 
-            <button id="speak-btn" class="btn" onclick="startListening()">🎤 Druk om te spreken</button>
+            <button id="speak-btn" class="btn" onclick="startListening()">🎤 Druk om te starten</button>
             <button id="manual-confirm-btn" class="btn btn-manual" style="display:none;" onclick="manualConfirmWord()">✅ Ik heb het woord gezegd</button>
 
             <div class="nav-buttons">
@@ -391,7 +391,6 @@
     let startX, startY, currentX, currentY;
     let zoomLevel = 1.0;
 
-    // Twee-vinger pan state
     let isPanning = false;
     let panLastMid = null;
 
@@ -408,6 +407,9 @@
     let hasReceivedSpeech = false;
     let recognitionRestartAttempts = 0;
 
+    let isAutoListening = false;
+    let currentWordErrorCount = 0;
+
     let correctCount = 0;
     let currentWordFailed = false;
     let currentStepId = 'step-upload';
@@ -421,7 +423,6 @@
     const wordsInput = document.getElementById('words-input');
     const cdnWarning = document.getElementById('cdn-warning');
 
-    /* CDN-BESCHIKBAARHEID CONTROLEREN (belangrijk bij wankele mobiele verbinding) */
     function checkCdnAvailability() {
         const missing = [];
         if (typeof Tesseract === 'undefined') missing.push('tekstherkenning');
@@ -435,11 +436,10 @@
 
     function safeConfetti(options) {
         if (typeof confetti === 'function') {
-            try { confetti(options); } catch (e) { /* stil negeren, niet kritiek */ }
+            try { confetti(options); } catch (e) {}
         }
     }
 
-    /* TEKST-NAAR-SPRAAK MET ROBUUSTERE STEMKEUZE */
     let cachedVoice = null;
     let voicesLoaded = false;
 
@@ -449,11 +449,9 @@
         if (!voices || voices.length === 0) return null;
         voicesLoaded = true;
 
-        // 1. Exacte Vlaamse stem
         let voice = voices.find(v => v.lang === 'nl-BE' || v.lang.includes('BE') ||
             (v.lang.toLowerCase().includes('nl') && (v.name.toLowerCase().includes('belgium') || v.name.toLowerCase().includes('flemish') || v.name.toLowerCase().includes('ellen'))));
 
-        // 2. Elke Nederlandstalige stem (bv. Nederland, als geen Vlaamse geïnstalleerd is)
         if (!voice) voice = voices.find(v => v.lang.toLowerCase().startsWith('nl'));
 
         return voice || null;
@@ -473,8 +471,6 @@
         if (!cachedVoice) cachedVoice = pickBestVoice();
         if (cachedVoice) utterance.voice = cachedVoice;
 
-        if (onEndCallback) utterance.onend = onEndCallback;
-        // Vangnet: als 'onend' door een Safari-eigenaardigheid niet vuurt, toch verdergaan
         const fallbackTimer = setTimeout(() => { if (onEndCallback) onEndCallback(); }, Math.max(1500, text.length * 350));
         utterance.onend = () => { clearTimeout(fallbackTimer); if (onEndCallback) onEndCallback(); };
         utterance.onerror = () => { clearTimeout(fallbackTimer); if (onEndCallback) onEndCallback(); };
@@ -484,7 +480,6 @@
 
     if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = () => { cachedVoice = pickBestVoice(); };
-        // iOS laadt stemmen soms pas na een korte vertraging
         setTimeout(() => { if (!voicesLoaded) cachedVoice = pickBestVoice(); }, 300);
     }
 
@@ -697,10 +692,8 @@
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
 
-    /* Touch: 1 vinger = tekenen/slepen, 2 vingers = de foto verschuiven (pannen) */
     canvas.addEventListener('touchstart', (e) => {
         if (e.touches && e.touches.length === 2) {
-            // Stop een eventuele lopende teken-actie en start pannen
             isDrawing = false;
             dragState = null;
             isPanning = true;
@@ -743,7 +736,6 @@
 
     document.getElementById('undo-box-btn').addEventListener('click', () => { boxes.pop(); redrawCanvas(); });
 
-    /* OCR VERWERKING MET VOORTGANGSBALK */
     document.getElementById('process-boxes-btn').addEventListener('click', async () => {
         if (boxes.length === 0) return alert("Trek eerst een kader rond een woordrijtje.");
 
@@ -812,7 +804,7 @@
         return map[status] || status;
     }
 
-    /* VERBETERDE SPRAAKHERKENNING */
+    /* SPRAAKHERKENNING LOGICA EN AUTO-LISTEN */
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognitionClass) {
         try {
@@ -855,31 +847,39 @@
 
             recognition.onerror = (event) => {
                 if (event.error === 'no-speech') {
-                    showPictoFeedback("🤐 Niets gehoord, probeer opnieuw!", false);
+                    // Niets gehoord
                 } else if (event.error === 'not-allowed') {
-                    showPictoFeedback("⚠️ Geef microfoontoegang in je (browser)instellingen.", true);
+                    showPictoFeedback("⚠️ Geef microfoontoegang in je instellingen.", true);
                     showSpeechFallback("Microfoontoegang staat uit. Je kan ook zonder microfoon oefenen:");
                 } else if (event.error === 'network') {
                     showPictoFeedback("⚠️ Geen verbinding voor spraakherkenning.", true);
                     showSpeechFallback("Spraakherkenning heeft internet nodig. Je kan ook zonder microfoon oefenen:");
-                } else if (event.error === 'aborted') {
-                    // door onszelf gestopt, geen actie nodig
-                } else {
-                    showPictoFeedback("⚠️ Spraakherkenning lukte niet.", true);
                 }
             };
 
             recognition.onend = () => {
-                document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-
-                if (!hasMatchedInSession && !isProcessingSpeech) {
-                    if (hasReceivedSpeech) {
-                        // Er is wél gesproken, maar het was fout
-                        handleSpeechError();
-                    } else {
-                        // Niks gehoord -> NIET meteen fout rekenen, vraag om nog eens te proberen
-                        showPictoFeedback("💡 Druk op de knop en spreek het woord uit.", false);
+                if (!isProcessingSpeech && currentMode === 3) {
+                    if (!hasMatchedInSession) {
+                        if (hasReceivedSpeech) {
+                            // Gesproken, maar het was fout
+                            handleSpeechError();
+                        } else {
+                            // Niks gehoord -> als we in auto-listen modus zitten, luister opnieuw
+                            if (isAutoListening) {
+                                showPictoFeedback("👂 Ik luister...", false);
+                                setTimeout(() => {
+                                    if (currentMode === 3 && isAutoListening && !isProcessingSpeech) {
+                                        startListening();
+                                    }
+                                }, 300);
+                            } else {
+                                document.getElementById('speak-btn').innerText = "🎤 Druk om te starten";
+                                showPictoFeedback("💡 Druk op de knop en spreek het woord uit.", false);
+                            }
+                        }
                     }
+                } else if (!isAutoListening) {
+                    document.getElementById('speak-btn').innerText = "🎤 Druk om te starten";
                 }
             };
         } catch (e) {
@@ -889,14 +889,15 @@
     }
 
     function startListening() {
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Stop eventueel voorlezen vooraf
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         showPictoFeedback('', false);
         isProcessingSpeech = false;
         hasMatchedInSession = false;
         hasReceivedSpeech = false;
+        isAutoListening = true; // Zodra gestart, geactiveerd voor automatisch vervolg
 
         if (!recognition) {
-            showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel/browser. Je kan ook zonder microfoon oefenen:");
+            showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel. Je kan ook zonder microfoon oefenen:");
             return;
         }
 
@@ -922,6 +923,7 @@
     }
 
     function showSpeechFallback(message) {
+        isAutoListening = false;
         const warning = document.getElementById('speech-warning');
         warning.style.display = 'block';
         warning.innerText = `ℹ️ ${message}`;
@@ -930,7 +932,6 @@
     }
 
     function manualConfirmWord() {
-        // Handmatige bevestiging (zonder microfoon): telt niet mee als 'in één keer goed'
         currentWordFailed = true;
         showPictoFeedback('🌟 Goed zo!', false);
         triggerRandomAnimation();
@@ -990,30 +991,46 @@
                     showCompletionView();
                 }
             }
-        }, 500);
+        }, 600);
     }
 
+    /* AANGEPASTE FOUTAFHANDELING VOOR DOOR-LEZEN */
     function handleSpeechError() {
         isProcessingSpeech = true;
         currentWordFailed = true;
+        currentWordErrorCount++;
 
         const card = document.getElementById('target-word');
         card.classList.add('shake');
         setTimeout(() => card.classList.remove('shake'), 400);
 
         const currentWord = wordList[currentIndex];
-        showPictoFeedback(`❌ Luister: "${currentWord}"`, true);
 
-        speakText(currentWord, () => {
-            setTimeout(() => {
-                isProcessingSpeech = false;
-                if (currentIndex < wordList.length - 1) {
-                    nextWord();
-                } else {
-                    showCompletionView();
-                }
-            }, 600);
-        });
+        if (currentWordErrorCount === 1) {
+            // 1e keer fout: toont rood kruis en leest auditief "Probeer nog eens" voor
+            showPictoFeedback(`❌ Probeer nog eens!`, true);
+            speakText("Probeer nog eens.", () => {
+                setTimeout(() => {
+                    isProcessingSpeech = false;
+                    if (currentMode === 3 && isAutoListening) {
+                        startListening();
+                    }
+                }, 300);
+            });
+        } else {
+            // 2e keer fout: toont rood kruis, leest het juiste woord voor en gaat naar volgend woord
+            showPictoFeedback(`❌ Het juiste woord is: "${currentWord}"`, true);
+            speakText(currentWord, () => {
+                setTimeout(() => {
+                    isProcessingSpeech = false;
+                    if (currentIndex < wordList.length - 1) {
+                        nextWord();
+                    } else {
+                        showCompletionView();
+                    }
+                }, 500);
+            });
+        }
     }
 
     /* OEFENMODI */
@@ -1065,13 +1082,12 @@
             currentIndex = 0;
             correctCount = 0;
 
-            // Toon de juiste invoerknop afhankelijk van spraakherkenning-ondersteuning
             if (speechRecognitionSupported) {
                 document.getElementById('speak-btn').style.display = 'block';
                 document.getElementById('manual-confirm-btn').style.display = 'none';
                 document.getElementById('speech-warning').style.display = 'none';
             } else {
-                showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel/browser. Je kan ook zonder microfoon oefenen:");
+                showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel. Je kan ook zonder microfoon oefenen:");
             }
 
             updateSingleWordUI();
@@ -1151,7 +1167,11 @@
 
     function stopSpeechAndTimers() {
         isPlayingList = false;
+        isAutoListening = false;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+        }
 
         const oldOverlay = document.getElementById('countdown-overlay');
         if (oldOverlay) oldOverlay.remove();
@@ -1166,10 +1186,22 @@
 
     function updateSingleWordUI() {
         currentWordFailed = false;
+        currentWordErrorCount = 0; // Reset foutenaantal per nieuw woord
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
-        document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
         showPictoFeedback('', false);
+
+        if (isAutoListening) {
+            document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
+            // Luister automatisch na een korte pauze zodat de leerling het woord kan zien
+            setTimeout(() => {
+                if (currentMode === 3 && isAutoListening && !isProcessingSpeech) {
+                    startListening();
+                }
+            }, 400);
+        } else {
+            document.getElementById('speak-btn').innerText = "🎤 Druk om te starten";
+        }
     }
 
     function showPictoFeedback(msg, isError = false) {
@@ -1229,7 +1261,6 @@
     }
 
     function resetApp() {
-        // Vraag bevestiging als er al voortgang is, zodat niemand per ongeluk alles kwijtraakt
         if (currentStepId !== 'step-upload') {
             const ok = confirm("Weet je zeker dat je wilt stoppen? Je huidige voortgang gaat verloren.");
             if (!ok) return;
