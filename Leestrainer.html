@@ -16,6 +16,7 @@
             --card: #FFFFFF;
             --text: #1F2937;
             --highlight: #FEF08A;
+            --error: #EF4444;
         }
 
         body {
@@ -65,6 +66,7 @@
             background-color: var(--primary); color: white; border: none;
             border-radius: 12px; font-size: 1.1rem; font-weight: 600; text-align: center; cursor: pointer;
             box-sizing: border-box;
+            transition: transform 0.1s ease;
         }
 
         .btn-secondary { background-color: #6B7280; }
@@ -72,38 +74,19 @@
 
         input[type="file"] { display: none; }
 
-        /* ZOOM CONTROLS & CANVAS HOLDER */
         .zoom-bar {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            background: #EEF2FF;
-            padding: 8px;
-            border-radius: 10px;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+            margin-bottom: 8px; background: #EEF2FF; padding: 8px; border-radius: 10px;
         }
 
         .zoom-btn {
-            background: #FFFFFF;
-            border: 1px solid #CBD5E1;
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            color: var(--primary);
+            background: #FFFFFF; border: 1px solid #CBD5E1; padding: 6px 14px;
+            border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; color: var(--primary);
         }
 
         .canvas-container {
-            position: relative; 
-            width: 100%; 
-            max-height: 60vh;
-            margin: 10px 0;
-            background: #000; 
-            border-radius: 12px; 
-            overflow: auto; /* Zorgt voor scrollen bij inzoomen */
-            display: none;
+            position: relative; width: 100%; max-height: 60vh; margin: 10px 0;
+            background: #000; border-radius: 12px; overflow: auto; display: none;
             -webkit-overflow-scrolling: touch;
         }
 
@@ -130,19 +113,19 @@
             position: relative;
             background-color: #F9FAFB; border: 2px dashed #CBD5E1; border-radius: 16px;
             padding: 20px; margin: 15px 0; display: flex; flex-direction: column; gap: 12px; align-items: center;
-            min-height: 150px;
-            overflow: hidden;
+            min-height: 150px; overflow: hidden;
         }
 
-        /* GROTE AFTELLER OVERLAY VOOR KOORLEZEN */
+        /* 3-2-1 AFTELLER BOVENAAN UITGELIJND */
         .countdown-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.94);
             display: flex;
             justify-content: center;
-            align-items: center;
-            font-size: 6.5rem;
+            align-items: flex-start; /* BOVENAAN GEPLAATST */
+            padding-top: 25px;       /* VASTE AFSTAND VAN BOVEN */
+            font-size: 6rem;
             font-weight: 900;
             color: var(--primary);
             z-index: 20;
@@ -151,8 +134,8 @@
         }
 
         @keyframes pulseCount {
-            0% { transform: scale(0.85); opacity: 0.8; }
-            100% { transform: scale(1.1); opacity: 1; }
+            0% { transform: scale(0.9); opacity: 0.8; }
+            100% { transform: scale(1.05); opacity: 1; }
         }
 
         .word-badge {
@@ -165,10 +148,14 @@
 
         .single-word-card {
             background-color: #EEF2FF; border: 3px solid var(--primary); border-radius: 16px;
-            padding: 30px; text-align: center; font-size: 2.8rem; font-weight: bold; margin: 15px 0; color: #312E81;
+            padding: 25px; text-align: center; font-size: 2.8rem; font-weight: bold; margin: 10px 0; color: #312E81;
         }
 
-        .picto-feedback { text-align: center; font-size: 4rem; min-height: 70px; margin-top: 10px; }
+        .picto-feedback { 
+            text-align: center; font-size: 1.2rem; font-weight: bold; min-height: 45px; margin-top: 10px; color: var(--primary);
+        }
+        .picto-feedback.error-msg { color: var(--error); }
+
         .loader { text-align: center; display: none; margin: 15px 0; font-weight: bold; color: var(--primary); }
         .nav-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
 
@@ -178,6 +165,14 @@
         }
         .thumbs-up-anim { font-size: 7rem; animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes bounceIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+
+        /* SHAKE ANIMATIE BIJ FOUT LEZEN */
+        .shake { animation: shake 0.4s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
     </style>
 </head>
 <body>
@@ -190,13 +185,12 @@
         <button class="btn-home" onclick="resetApp()">🏠 Home</button>
     </div>
 
-    <!-- STAP 1: FOTO & VAKKEN TEKENEN -->
+    <!-- STAP 1 -->
     <div id="step-upload" class="step-panel active">
         <label for="camera-input" class="btn">📸 Foto Maken / Kiezen</label>
         <input type="file" id="camera-input" accept="image/*" capture="environment">
 
         <div id="draw-controls" style="display:none;">
-            <!-- ZOOM KNOPPEN -->
             <div class="zoom-bar">
                 <span>🔍 Zoom:</span>
                 <button class="zoom-btn" onclick="adjustZoom(0.25)">➕ In</button>
@@ -244,11 +238,13 @@
             <span class="speed-icon">🐇</span>
         </div>
 
+        <!-- VOOR & KOOR LEZEN: KNOP STAAT NU BOVENAAN! -->
         <div id="full-list-view">
-            <div class="full-list-card" id="full-list-container"></div>
             <button id="play-list-btn" class="btn" onclick="handleFullListAction()">🔊 Beluister het rijtje</button>
+            <div class="full-list-card" id="full-list-container"></div>
         </div>
 
+        <!-- DOOR LEZEN (INDIVIDUEEL) -->
         <div id="single-word-view" style="display:none;">
             <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-bottom: 5px;">
                 <span id="progress-text">Woord 1 van 5</span>
@@ -298,6 +294,7 @@
     let isPlayingList = false;
     let errorCount = 0;
     let isProcessingSpeech = false;
+    let hasMatchedInSession = false;
 
     const cameraInput = document.getElementById('camera-input');
     const canvasContainer = document.getElementById('canvas-container');
@@ -355,7 +352,6 @@
         redrawCanvas();
     }
 
-    /* ZOOM FUNCTIES */
     function adjustZoom(delta) {
         zoomLevel = Math.max(0.75, Math.min(2.5, zoomLevel + delta));
         applyZoomStyle();
@@ -440,7 +436,6 @@
         return null;
     }
 
-    /* AANGEPAST VOOR EXACTE TOUCH-MAPPING BIJ ZOOM */
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -514,18 +509,9 @@
     canvas.addEventListener('touchmove', (e) => { handleMove(e); e.preventDefault(); });
     canvas.addEventListener('touchend', handleEnd);
 
-    /* KNOPPEN VOOR WISSEN & UNDO */
-    document.getElementById('undo-box-btn').addEventListener('click', () => { 
-        boxes.pop(); 
-        redrawCanvas(); 
-    });
+    document.getElementById('undo-box-btn').addEventListener('click', () => { boxes.pop(); redrawCanvas(); });
+    document.getElementById('clear-boxes-btn').addEventListener('click', () => { boxes = []; redrawCanvas(); });
 
-    document.getElementById('clear-boxes-btn').addEventListener('click', () => { 
-        boxes = []; 
-        redrawCanvas(); 
-    });
-
-    /* OCR VERWERKING */
     document.getElementById('process-boxes-btn').addEventListener('click', async () => {
         if (boxes.length === 0) return alert("Trek eerst een kader rond een rijtje.");
         canvasContainer.style.display = 'none'; drawControls.style.display = 'none'; ocrLoader.style.display = 'block';
@@ -555,14 +541,16 @@
         switchStep('step-review');
     });
 
-    /* SPRAAKHERKENNING */
+    // -------------------------------------------------------------
+    // SLIMME & VERBETERDE SPRAAKHERKENNING
+    // -------------------------------------------------------------
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'nl-BE';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 5;
+        recognition.continuous = false;      // Luister per poging
+        recognition.interimResults = true;  // Directe feedback bij match
+        recognition.maxAlternatives = 3;
 
         recognition.onresult = (event) => {
             if (isProcessingSpeech) return;
@@ -572,7 +560,9 @@
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 for (let j = 0; j < event.results[i].length; j++) {
                     const spoken = event.results[i][j].transcript.toLowerCase().trim();
+
                     if (isFuzzyMatch(spoken, target)) {
+                        hasMatchedInSession = true;
                         isProcessingSpeech = true;
                         recognition.stop();
                         evaluateSpeechSuccess();
@@ -582,19 +572,33 @@
             }
         };
 
+        recognition.onend = () => {
+            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+            
+            // Als er geen succesvolle match was toen het spreken stopte -> FOUT FEEDBACK
+            if (!hasMatchedInSession && !isProcessingSpeech) {
+                handleSpeechError();
+            }
+        };
+
         recognition.onerror = () => {
-            if (!isProcessingSpeech) {
-                showPictoFeedback('👂');
-                document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+            if (!hasMatchedInSession && !isProcessingSpeech) {
+                handleSpeechError();
             }
         };
     }
 
+    // AANGEPASTE STRENGERE MATCHING (Minder vergevingsgezind)
     function isFuzzyMatch(spoken, target) {
-        if (spoken.includes(target)) return true;
+        // 1. Korte woorden (≤ 4 letters): EXACTE MATCH VERREST!
+        if (target.length <= 4) {
+            return spoken === target;
+        }
+
+        // 2. Langere woorden: Minstens 85% gelijkenis vereist
         const dist = levenshtein(spoken, target);
-        if (target.length <= 4 && dist <= 1) return true;
-        return (1 - (dist / Math.max(spoken.length, target.length))) >= 0.70;
+        const similarity = 1 - (dist / Math.max(spoken.length, target.length));
+        return similarity >= 0.85;
     }
 
     function levenshtein(a, b) {
@@ -617,7 +621,7 @@
 
     function evaluateSpeechSuccess() {
         errorCount = 0;
-        showPictoFeedback('🌟');
+        showPictoFeedback('🌟 Goed zo!', false);
         triggerRandomAnimation();
 
         setTimeout(() => {
@@ -632,10 +636,29 @@
         }, 400);
     }
 
+    function handleSpeechError() {
+        errorCount++;
+        const card = document.getElementById('target-word');
+        card.classList.add('shake');
+        setTimeout(() => card.classList.remove('shake'), 400);
+
+        if (errorCount >= 2) {
+            // Na 2 fouten: Spreek het woord voor als hulp
+            showPictoFeedback('💡 Luister goed...', true);
+            speakText(wordList[currentIndex], () => {
+                showPictoFeedback('❌ Probeer het nog eens!', true);
+            });
+        } else {
+            showPictoFeedback('❌ Oeps! Probeer het nog eens.', true);
+        }
+    }
+
     function startListening() {
-        showPictoFeedback('');
+        showPictoFeedback('', false);
         isProcessingSpeech = false;
-        if (!recognition) return alert("Spraakherkenning wordt niet ondersteund.");
+        hasMatchedInSession = false;
+        
+        if (!recognition) return alert("Spraakherkenning wordt niet ondersteund in deze browser.");
         
         document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
         try { recognition.start(); } catch(e) { recognition.stop(); recognition.start(); }
@@ -675,7 +698,7 @@
         const speedControl = document.getElementById('speed-control-box');
         const playListBtn = document.getElementById('play-list-btn');
 
-        showPictoFeedback('');
+        showPictoFeedback('', false);
 
         if (mode === 1 || mode === 2) {
             fullListView.style.display = 'block';
@@ -697,10 +720,8 @@
         if (currentMode === 1) {
             readFullListSequentially();
         } else if (currentMode === 2) {
-            /* GROTE 3-2-1 AFTELLING OVER DE WOORDEN */
             const container = document.getElementById('full-list-container');
             
-            // Verwijder eventuele oude overlay
             const oldOverlay = document.getElementById('countdown-overlay');
             if (oldOverlay) oldOverlay.remove();
 
@@ -728,7 +749,6 @@
         }
     }
 
-    /* DYNAMISCHE PAUZE BIJ TRAAG VOORLEZEN */
     function readFullListSequentially() {
         stopSpeechAndTimers();
         isPlayingList = true;
@@ -740,7 +760,7 @@
         function speakNext() {
             if (index >= wordList.length || !isPlayingList) {
                 stopSpeechAndTimers();
-                showPictoFeedback('🌟');
+                showPictoFeedback('🌟 Super gedaan!', false);
                 triggerRandomAnimation();
                 return;
             }
@@ -751,8 +771,6 @@
 
             speakText(wordList[index], () => {
                 index++;
-                
-                // Bereken pauze op basis van spreeksnelheid (Bij 0.1 rate = ~1300ms pauze, bij 0.8 rate = ~350ms pauze)
                 const speedVal = parseFloat(document.getElementById('speed-slider').value);
                 const pauseBetweenWords = Math.max(350, Math.round(1400 - (speedVal * 1300)));
 
@@ -785,10 +803,15 @@
         document.getElementById('target-word').innerText = wordList[currentIndex];
         document.getElementById('progress-text').innerText = `Woord ${currentIndex + 1} van ${wordList.length}`;
         document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-        showPictoFeedback('');
+        showPictoFeedback('', false);
     }
 
-    function showPictoFeedback(emoji) { document.getElementById('picto-feedback').innerText = emoji; }
+    function showPictoFeedback(msg, isError = false) { 
+        const fb = document.getElementById('picto-feedback');
+        fb.innerText = msg;
+        if (isError) fb.classList.add('error-msg');
+        else fb.classList.remove('error-msg');
+    }
 
     function triggerRandomAnimation() {
         const choice = Math.floor(Math.random() * 3);
