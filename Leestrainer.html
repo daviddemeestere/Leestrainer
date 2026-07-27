@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>Leestrainer</title>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -20,12 +20,15 @@
             --success: #10B981;
         }
 
+        * { -webkit-tap-highlight-color: transparent; }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
             padding: 15px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -69,21 +72,24 @@
             box-sizing: border-box;
             transition: transform 0.1s ease;
         }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .btn-secondary { background-color: #6B7280; }
         .btn-outline { background-color: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-manual { background-color: var(--success); }
 
         input[type="file"] { display: none; }
 
         .zoom-bar {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
             gap: 6px;
-            margin-bottom: 8px; 
-            background: #EEF2FF; 
-            padding: 8px 12px; 
+            margin-bottom: 8px;
+            background: #EEF2FF;
+            padding: 8px 12px;
             border-radius: 12px;
         }
 
@@ -122,20 +128,20 @@
             transition: all 0.2s ease;
         }
 
-        .btn-anker:hover {
+        .btn-anker:active {
             background-color: var(--primary);
             color: white;
         }
 
         .canvas-container {
-            position: relative; 
-            width: 100%; 
-            max-height: 55vh; 
+            position: relative;
+            width: 100%;
+            max-height: 55vh;
             margin: 10px 0;
-            background: #0F172A; 
-            border-radius: 12px; 
+            background: #0F172A;
+            border-radius: 12px;
             overflow: scroll;
-            -webkit-overflow-scrolling: touch; 
+            -webkit-overflow-scrolling: touch;
             border: 2px solid #CBD5E1;
             scrollbar-width: auto;
             scrollbar-color: #4F46E5 #E2E8F0;
@@ -145,7 +151,7 @@
         .canvas-container::-webkit-scrollbar-track { background: #E2E8F0; border-radius: 6px; }
         .canvas-container::-webkit-scrollbar-thumb { background-color: var(--primary); border-radius: 6px; border: 2px solid #E2E8F0; }
 
-        canvas { display: block; cursor: crosshair; touch-action: auto; }
+        canvas { display: block; cursor: crosshair; touch-action: none; }
 
         textarea {
             width: 100%; height: 140px; border: 1px solid #D1D5DB;
@@ -199,18 +205,26 @@
             padding: 25px; text-align: center; font-size: 2.8rem; font-weight: bold; margin: 10px 0; color: #312E81;
         }
 
-        .picto-feedback { 
+        .picto-feedback {
             text-align: center; font-size: 1.2rem; font-weight: bold; min-height: 45px; margin-top: 10px; color: var(--primary);
         }
         .picto-feedback.error-msg { color: var(--error); }
 
         .loader { text-align: center; display: none; margin: 15px 0; font-weight: bold; color: var(--primary); }
+        .loader-bar-track { width: 100%; height: 10px; background: #E5E7EB; border-radius: 6px; margin-top: 10px; overflow: hidden; }
+        .loader-bar-fill { height: 100%; width: 0%; background: var(--primary); border-radius: 6px; transition: width 0.2s ease; }
+
         .nav-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 15px; }
 
         .score-card {
-            display: none; margin: 15px 0; font-size: 1.3rem; font-weight: bold; 
-            color: var(--primary); background: #EEF2FF; padding: 15px; 
+            display: none; margin: 15px 0; font-size: 1.3rem; font-weight: bold;
+            color: var(--primary); background: #EEF2FF; padding: 15px;
             border-radius: 12px; border: 2px solid var(--primary); text-align: center;
+        }
+
+        .info-banner {
+            display: none; background: #FEF3C7; border: 1px solid #FBBF24; color: #92400E;
+            padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 10px; text-align: center;
         }
 
         .anim-overlay {
@@ -226,33 +240,43 @@
             20%, 60% { transform: translateX(-8px); }
             40%, 80% { transform: translateX(8px); }
         }
+
+        button:focus-visible, .btn-anker:focus-visible, label:focus-visible {
+            outline: 3px solid #312E81; outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .shake, .thumbs-up-anim, .countdown-overlay { animation: none !important; }
+        }
     </style>
 </head>
 <body>
 
-<div id="anim-container" class="anim-overlay"></div>
+<div id="anim-container" class="anim-overlay" aria-hidden="true"></div>
 
 <div class="container">
     <div class="header-bar">
         <h1>📖 Leestrainer</h1>
-        <button class="btn-home" onclick="resetApp()">🏠 Home</button>
+        <button class="btn-home" onclick="resetApp()" aria-label="Terug naar start">🏠 Home</button>
     </div>
 
     <!-- STAP 1: KEUZE FOTO OF ANKER -->
     <div id="step-upload" class="step-panel active">
+        <div id="cdn-warning" class="info-banner" role="alert"></div>
+
         <label for="camera-input" class="btn">📸 Foto maken</label>
-        <input type="file" id="camera-input" accept="image/*" capture="environment">
+        <input type="file" id="camera-input" accept="image/*" capture="environment" aria-label="Maak een foto van een woordrijtje">
 
         <div style="margin-top: 20px; border-top: 2px solid #F3F4F6; padding-top: 15px;">
             <p style="font-weight: bold; text-align: center; margin-bottom: 10px; color: #4B5563;">
                 📚 Of kies een Anker:
             </p>
             <div class="anker-grid">
-                <button class="btn-anker" onclick="loadAnker(1)">1</button>
-                <button class="btn-anker" onclick="loadAnker(2)">2</button>
-                <button class="btn-anker" onclick="loadAnker(3)">3</button>
-                <button class="btn-anker" onclick="loadAnker(4)">4</button>
-                <button class="btn-anker" onclick="loadAnker(5)">5</button>
+                <button class="btn-anker" onclick="loadAnker(1)" aria-label="Ankerlijst 1">1</button>
+                <button class="btn-anker" onclick="loadAnker(2)" aria-label="Ankerlijst 2">2</button>
+                <button class="btn-anker" onclick="loadAnker(3)" aria-label="Ankerlijst 3">3</button>
+                <button class="btn-anker" onclick="loadAnker(4)" aria-label="Ankerlijst 4">4</button>
+                <button class="btn-anker" onclick="loadAnker(5)" aria-label="Ankerlijst 5">5</button>
             </div>
         </div>
 
@@ -260,9 +284,9 @@
             <div class="zoom-bar">
                 <div style="display: flex; align-items: center; gap: 4px;">
                     <span style="font-size: 0.85rem; font-weight: bold;">🔍 Zoom:</span>
-                    <button class="zoom-btn" onclick="adjustZoom(0.3)">➕</button>
-                    <button class="zoom-btn" onclick="adjustZoom(-0.3)">➖</button>
-                    <button class="zoom-btn" onclick="resetZoom()">🔄</button>
+                    <button class="zoom-btn" onclick="adjustZoom(0.3)" aria-label="Inzoomen">➕</button>
+                    <button class="zoom-btn" onclick="adjustZoom(-0.3)" aria-label="Uitzoomen">➖</button>
+                    <button class="zoom-btn" onclick="resetZoom()" aria-label="Zoom herstellen">🔄</button>
                 </div>
                 <div style="display: flex; gap: 6px;">
                     <button id="undo-box-btn" class="btn-undo-top">↩️ Wissen</button>
@@ -280,13 +304,16 @@
             </p>
         </div>
 
-        <div id="ocr-loader" class="loader">⏳ Tekst wordt herkend...</div>
+        <div id="ocr-loader" class="loader">
+            <div id="ocr-loader-text">⏳ Tekst wordt herkend...</div>
+            <div class="loader-bar-track"><div id="ocr-loader-fill" class="loader-bar-fill"></div></div>
+        </div>
     </div>
 
     <!-- STAP 2: CONTROLEER WOORDEN -->
     <div id="step-review" class="step-panel">
         <p><strong>Herkende / Geselecteerde woorden:</strong></p>
-        <textarea id="words-input" placeholder="Elk woord op een nieuwe regel..."></textarea>
+        <textarea id="words-input" placeholder="Elk woord op een nieuwe regel..." aria-label="Woordenlijst, één woord per regel"></textarea>
         <button id="start-practice-btn" class="btn">🚀 Start Leesoefening</button>
     </div>
 
@@ -299,9 +326,9 @@
         </div>
 
         <div class="speed-control" id="speed-control-box">
-            <span class="speed-icon">🐢</span>
-            <input type="range" id="speed-slider" class="speed-slider" min="0.1" max="0.8" step="0.05" value="0.35">
-            <span class="speed-icon">🐇</span>
+            <span class="speed-icon" aria-hidden="true">🐢</span>
+            <input type="range" id="speed-slider" class="speed-slider" min="0.1" max="0.8" step="0.05" value="0.35" aria-label="Voorleessnelheid">
+            <span class="speed-icon" aria-hidden="true">🐇</span>
         </div>
 
         <div id="full-list-view">
@@ -316,7 +343,10 @@
 
             <div class="single-word-card" id="target-word">...</div>
 
+            <div id="speech-warning" class="info-banner"></div>
+
             <button id="speak-btn" class="btn" onclick="startListening()">🎤 Druk om te spreken</button>
+            <button id="manual-confirm-btn" class="btn btn-manual" style="display:none;" onclick="manualConfirmWord()">✅ Ik heb het woord gezegd</button>
 
             <div class="nav-buttons">
                 <button class="btn btn-outline" style="margin:0;" onclick="prevWord()">⬅️ Vorige</button>
@@ -324,7 +354,7 @@
             </div>
         </div>
 
-        <div id="picto-feedback" class="picto-feedback"></div>
+        <div id="picto-feedback" class="picto-feedback" role="status" aria-live="polite"></div>
     </div>
 
     <!-- STAP 4: AFGEROND & SCORE -->
@@ -332,7 +362,7 @@
         <div style="text-align: center; padding: 20px 10px;">
             <div style="font-size: 5rem;">🏆🌟🎉</div>
             <h2 style="color: var(--primary); margin-bottom: 5px;">Super gedaan!</h2>
-            
+
             <div id="score-display" class="score-card"></div>
 
             <button class="btn" onclick="setMode(1); switchStep('step-practice');">🔄 Nog eens oefenen</button>
@@ -354,51 +384,108 @@
     let loadedImage = null;
     let canvas = document.getElementById('image-canvas');
     let ctx = canvas.getContext('2d');
-    
+
     let boxes = [];
     let isDrawing = false;
     let dragState = null;
     let startX, startY, currentX, currentY;
     let zoomLevel = 1.0;
 
-    const HANDLE_RADIUS = 22; 
+    // Twee-vinger pan state
+    let isPanning = false;
+    let panLastMid = null;
+
+    const HANDLE_RADIUS = 22;
 
     let wordList = [];
     let currentIndex = 0;
     let currentMode = 1;
     let recognition = null;
+    let speechRecognitionSupported = false;
     let isPlayingList = false;
     let isProcessingSpeech = false;
     let hasMatchedInSession = false;
     let hasReceivedSpeech = false;
+    let recognitionRestartAttempts = 0;
 
     let correctCount = 0;
     let currentWordFailed = false;
+    let currentStepId = 'step-upload';
 
     const cameraInput = document.getElementById('camera-input');
     const canvasContainer = document.getElementById('canvas-container');
     const drawControls = document.getElementById('draw-controls');
     const ocrLoader = document.getElementById('ocr-loader');
+    const ocrLoaderText = document.getElementById('ocr-loader-text');
+    const ocrLoaderFill = document.getElementById('ocr-loader-fill');
     const wordsInput = document.getElementById('words-input');
+    const cdnWarning = document.getElementById('cdn-warning');
+
+    /* CDN-BESCHIKBAARHEID CONTROLEREN (belangrijk bij wankele mobiele verbinding) */
+    function checkCdnAvailability() {
+        const missing = [];
+        if (typeof Tesseract === 'undefined') missing.push('tekstherkenning');
+        if (typeof confetti === 'undefined') missing.push('animaties');
+        if (missing.length > 0) {
+            cdnWarning.style.display = 'block';
+            cdnWarning.innerText = `⚠️ Kon onderdelen voor ${missing.join(' en ')} niet laden. Controleer je internetverbinding en herlaad de pagina. De ankerlijsten werken wel gewoon.`;
+        }
+    }
+    checkCdnAvailability();
+
+    function safeConfetti(options) {
+        if (typeof confetti === 'function') {
+            try { confetti(options); } catch (e) { /* stil negeren, niet kritiek */ }
+        }
+    }
+
+    /* TEKST-NAAR-SPRAAK MET ROBUUSTERE STEMKEUZE */
+    let cachedVoice = null;
+    let voicesLoaded = false;
+
+    function pickBestVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) return null;
+        voicesLoaded = true;
+
+        // 1. Exacte Vlaamse stem
+        let voice = voices.find(v => v.lang === 'nl-BE' || v.lang.includes('BE') ||
+            (v.lang.toLowerCase().includes('nl') && (v.name.toLowerCase().includes('belgium') || v.name.toLowerCase().includes('flemish') || v.name.toLowerCase().includes('ellen'))));
+
+        // 2. Elke Nederlandstalige stem (bv. Nederland, als geen Vlaamse geïnstalleerd is)
+        if (!voice) voice = voices.find(v => v.lang.toLowerCase().startsWith('nl'));
+
+        return voice || null;
+    }
 
     function speakText(text, onEndCallback = null) {
-        if (!('speechSynthesis' in window)) return;
+        if (!('speechSynthesis' in window)) {
+            if (onEndCallback) onEndCallback();
+            return;
+        }
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = parseFloat(document.getElementById('speed-slider').value);
         utterance.lang = 'nl-BE';
 
-        const voices = window.speechSynthesis.getVoices();
-        const flemishVoice = voices.find(v => 
-            v.lang === 'nl-BE' || v.lang.includes('BE') || 
-            (v.lang.includes('nl') && (v.name.toLowerCase().includes('belgium') || v.name.toLowerCase().includes('flemish') || v.name.toLowerCase().includes('ellen')))
-        );
+        if (!cachedVoice) cachedVoice = pickBestVoice();
+        if (cachedVoice) utterance.voice = cachedVoice;
 
-        if (flemishVoice) utterance.voice = flemishVoice;
         if (onEndCallback) utterance.onend = onEndCallback;
+        // Vangnet: als 'onend' door een Safari-eigenaardigheid niet vuurt, toch verdergaan
+        const fallbackTimer = setTimeout(() => { if (onEndCallback) onEndCallback(); }, Math.max(1500, text.length * 350));
+        utterance.onend = () => { clearTimeout(fallbackTimer); if (onEndCallback) onEndCallback(); };
+        utterance.onerror = () => { clearTimeout(fallbackTimer); if (onEndCallback) onEndCallback(); };
 
         window.speechSynthesis.speak(utterance);
+    }
+
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => { cachedVoice = pickBestVoice(); };
+        // iOS laadt stemmen soms pas na een korte vertraging
+        setTimeout(() => { if (!voicesLoaded) cachedVoice = pickBestVoice(); }, 300);
     }
 
     function loadAnker(num) {
@@ -425,8 +512,12 @@
                 canvasContainer.style.display = 'block';
                 drawControls.style.display = 'block';
             };
+            loadedImage.onerror = () => {
+                alert('Deze foto kon niet geladen worden. Probeer het opnieuw.');
+            };
             loadedImage.src = event.target.result;
         };
+        reader.onerror = () => alert('De foto kon niet gelezen worden. Probeer het opnieuw.');
         reader.readAsDataURL(file);
     });
 
@@ -434,10 +525,10 @@
         boxes = [];
         const containerWidth = canvasContainer.clientWidth || 440;
         const baseScale = containerWidth / loadedImage.width;
-        
+
         canvas.width = containerWidth;
         canvas.height = loadedImage.height * baseScale;
-        
+
         applyZoomStyle();
         redrawCanvas();
     }
@@ -455,7 +546,7 @@
     function applyZoomStyle() {
         const containerWidth = canvasContainer.clientWidth || 440;
         const baseHeight = (loadedImage.height * (containerWidth / loadedImage.width));
-        
+
         canvas.style.width = (containerWidth * zoomLevel) + 'px';
         canvas.style.height = (baseHeight * zoomLevel) + 'px';
     }
@@ -533,10 +624,17 @@
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        
-        return { 
-            x: (clientX - rect.left) * (canvas.width / rect.width), 
-            y: (clientY - rect.top) * (canvas.height / rect.height) 
+
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function getTouchMidpoint(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
         };
     }
 
@@ -599,25 +697,64 @@
     canvas.addEventListener('mousemove', handleMove);
     canvas.addEventListener('mouseup', handleEnd);
 
+    /* Touch: 1 vinger = tekenen/slepen, 2 vingers = de foto verschuiven (pannen) */
     canvas.addEventListener('touchstart', (e) => {
-        if (e.touches && e.touches.length > 1) return; 
+        if (e.touches && e.touches.length === 2) {
+            // Stop een eventuele lopende teken-actie en start pannen
+            isDrawing = false;
+            dragState = null;
+            isPanning = true;
+            panLastMid = getTouchMidpoint(e.touches);
+            e.preventDefault();
+            return;
+        }
+        if (e.touches && e.touches.length > 2) return;
         handleStart(e);
-    });
+    }, { passive: false });
+
     canvas.addEventListener('touchmove', (e) => {
+        if (isPanning && e.touches && e.touches.length === 2) {
+            const mid = getTouchMidpoint(e.touches);
+            const dx = mid.x - panLastMid.x;
+            const dy = mid.y - panLastMid.y;
+            canvasContainer.scrollLeft -= dx;
+            canvasContainer.scrollTop -= dy;
+            panLastMid = mid;
+            e.preventDefault();
+            return;
+        }
         if (e.touches && e.touches.length > 1) return;
         if (isDrawing || dragState) {
-            e.preventDefault(); 
+            e.preventDefault();
         }
         handleMove(e);
     }, { passive: false });
-    canvas.addEventListener('touchend', handleEnd);
+
+    canvas.addEventListener('touchend', (e) => {
+        if (e.touches && e.touches.length < 2) {
+            isPanning = false;
+            panLastMid = null;
+        }
+        if (!e.touches || e.touches.length === 0) {
+            handleEnd();
+        }
+    });
+    canvas.addEventListener('touchcancel', () => { isPanning = false; panLastMid = null; handleEnd(); });
 
     document.getElementById('undo-box-btn').addEventListener('click', () => { boxes.pop(); redrawCanvas(); });
 
-    /* OCR VERWERKING */
+    /* OCR VERWERKING MET VOORTGANGSBALK */
     document.getElementById('process-boxes-btn').addEventListener('click', async () => {
         if (boxes.length === 0) return alert("Trek eerst een kader rond een woordrijtje.");
+
+        if (typeof Tesseract === 'undefined') {
+            alert("Tekstherkenning kon niet geladen worden. Controleer je internetverbinding en herlaad de pagina.");
+            return;
+        }
+
         canvasContainer.style.display = 'none'; drawControls.style.display = 'none'; ocrLoader.style.display = 'block';
+        ocrLoaderFill.style.width = '0%';
+        ocrLoaderText.innerText = '⏳ Tekst wordt herkend...';
 
         let allRecognizedWords = [];
         const scaleX = loadedImage.width / canvas.width;
@@ -631,7 +768,16 @@
             tempCtx.drawImage(loadedImage, box.x * scaleX, box.y * scaleY, box.w * scaleX, box.h * scaleY, 0, 0, tempCanvas.width, tempCanvas.height);
 
             try {
-                const result = await Tesseract.recognize(tempCanvas, 'nld');
+                const result = await Tesseract.recognize(tempCanvas, 'nld', {
+                    logger: m => {
+                        if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+                            const overall = ((i + m.progress) / boxes.length) * 100;
+                            ocrLoaderFill.style.width = Math.round(overall) + '%';
+                        } else if (m.status) {
+                            ocrLoaderText.innerText = `⏳ ${translateOcrStatus(m.status)} (${i + 1}/${boxes.length})`;
+                        }
+                    }
+                });
                 result.data.text.split('\n').forEach(line => {
                     let clean = line.replace(/[^a-zA-ZáéíóúäëïöüÅå-]/g, "").trim();
                     if (clean.length > 0) {
@@ -639,73 +785,107 @@
                         allRecognizedWords.push(formattedWord);
                     }
                 });
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                ocrLoaderText.innerText = `⚠️ Kader ${i + 1} kon niet herkend worden, ga verder...`;
+            }
         }
 
         ocrLoader.style.display = 'none';
+
+        if (allRecognizedWords.length === 0) {
+            alert("Er werd geen tekst herkend. Probeer een duidelijkere foto of pas de woorden hieronder handmatig aan.");
+        }
+
         wordsInput.value = allRecognizedWords.join('\n');
         switchStep('step-review');
     });
 
-    /* VERBETERDE SPRAAKHERKENNING */
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.lang = 'nl-BE';
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 5;
-
-        recognition.onstart = () => {
-            isProcessingSpeech = false;
-            hasMatchedInSession = false;
-            hasReceivedSpeech = false;
-            document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
-            showPictoFeedback("👂 Ik luister...", false);
+    function translateOcrStatus(status) {
+        const map = {
+            'loading tesseract core': 'Tekstherkenning laden',
+            'initializing tesseract': 'Voorbereiden',
+            'loading language traineddata': 'Taalbestand laden',
+            'initializing api': 'Klaarzetten',
+            'recognizing text': 'Herkennen'
         };
+        return map[status] || status;
+    }
 
-        recognition.onresult = (event) => {
-            if (isProcessingSpeech) return;
-            hasReceivedSpeech = true;
+    /* VERBETERDE SPRAAKHERKENNING */
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+        try {
+            recognition = new SpeechRecognitionClass();
+            recognition.lang = 'nl-BE';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 5;
+            speechRecognitionSupported = true;
 
-            const target = wordList[currentIndex].toLowerCase().trim();
+            recognition.onstart = () => {
+                isProcessingSpeech = false;
+                hasMatchedInSession = false;
+                hasReceivedSpeech = false;
+                recognitionRestartAttempts = 0;
+                document.getElementById('speak-btn').innerText = "🎙️ Aan het luisteren...";
+                showPictoFeedback("👂 Ik luister...", false);
+            };
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                for (let j = 0; j < event.results[i].length; j++) {
-                    const spoken = event.results[i][j].transcript.toLowerCase().trim();
+            recognition.onresult = (event) => {
+                if (isProcessingSpeech) return;
+                hasReceivedSpeech = true;
 
-                    if (isFuzzyMatch(spoken, target)) {
-                        hasMatchedInSession = true;
-                        isProcessingSpeech = true;
-                        recognition.stop();
-                        evaluateSpeechSuccess();
-                        return;
+                const target = wordList[currentIndex].toLowerCase().trim();
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    for (let j = 0; j < event.results[i].length; j++) {
+                        const spoken = event.results[i][j].transcript.toLowerCase().trim();
+
+                        if (isFuzzyMatch(spoken, target)) {
+                            hasMatchedInSession = true;
+                            isProcessingSpeech = true;
+                            recognition.stop();
+                            evaluateSpeechSuccess();
+                            return;
+                        }
                     }
                 }
-            }
-        };
+            };
 
-        recognition.onerror = (event) => {
-            if (event.error === 'no-speech') {
-                showPictoFeedback("🤐 Niets gehoord, probeer opnieuw!", false);
-            } else if (event.error === 'not-allowed') {
-                showPictoFeedback("⚠️ Geef microfoontoegang in je browser.", true);
-            }
-        };
-
-        recognition.onend = () => {
-            document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
-
-            if (!hasMatchedInSession && !isProcessingSpeech) {
-                if (hasReceivedSpeech) {
-                    // Er is wél gesproken, maar het was fout
-                    handleSpeechError();
+            recognition.onerror = (event) => {
+                if (event.error === 'no-speech') {
+                    showPictoFeedback("🤐 Niets gehoord, probeer opnieuw!", false);
+                } else if (event.error === 'not-allowed') {
+                    showPictoFeedback("⚠️ Geef microfoontoegang in je (browser)instellingen.", true);
+                    showSpeechFallback("Microfoontoegang staat uit. Je kan ook zonder microfoon oefenen:");
+                } else if (event.error === 'network') {
+                    showPictoFeedback("⚠️ Geen verbinding voor spraakherkenning.", true);
+                    showSpeechFallback("Spraakherkenning heeft internet nodig. Je kan ook zonder microfoon oefenen:");
+                } else if (event.error === 'aborted') {
+                    // door onszelf gestopt, geen actie nodig
                 } else {
-                    // Niks gehoord -> NIET meteen fout rekenen, vraag om nog eens te proberen
-                    showPictoFeedback("💡 Druk op de knop en spreek het woord uit.", false);
+                    showPictoFeedback("⚠️ Spraakherkenning lukte niet.", true);
                 }
-            }
-        };
+            };
+
+            recognition.onend = () => {
+                document.getElementById('speak-btn').innerText = "🎤 Druk om te spreken";
+
+                if (!hasMatchedInSession && !isProcessingSpeech) {
+                    if (hasReceivedSpeech) {
+                        // Er is wél gesproken, maar het was fout
+                        handleSpeechError();
+                    } else {
+                        // Niks gehoord -> NIET meteen fout rekenen, vraag om nog eens te proberen
+                        showPictoFeedback("💡 Druk op de knop en spreek het woord uit.", false);
+                    }
+                }
+            };
+        } catch (e) {
+            speechRecognitionSupported = false;
+            recognition = null;
+        }
     }
 
     function startListening() {
@@ -714,17 +894,56 @@
         isProcessingSpeech = false;
         hasMatchedInSession = false;
         hasReceivedSpeech = false;
-        
-        if (!recognition) return alert("Spraakherkenning wordt niet ondersteund in deze browser.");
 
-        try { 
-            recognition.start(); 
-        } catch(e) { 
-            try {
-                recognition.stop(); 
-                setTimeout(() => recognition.start(), 100);
-            } catch(err) {}
+        if (!recognition) {
+            showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel/browser. Je kan ook zonder microfoon oefenen:");
+            return;
         }
+
+        try {
+            recognition.start();
+        } catch (e) {
+            recognitionRestartAttempts++;
+            if (recognitionRestartAttempts <= 2) {
+                try {
+                    recognition.stop();
+                    setTimeout(() => {
+                        try { recognition.start(); } catch (err2) {
+                            showSpeechFallback("Spraakherkenning start niet op. Je kan ook zonder microfoon oefenen:");
+                        }
+                    }, 150);
+                } catch (err) {
+                    showSpeechFallback("Spraakherkenning start niet op. Je kan ook zonder microfoon oefenen:");
+                }
+            } else {
+                showSpeechFallback("Spraakherkenning start niet op. Je kan ook zonder microfoon oefenen:");
+            }
+        }
+    }
+
+    function showSpeechFallback(message) {
+        const warning = document.getElementById('speech-warning');
+        warning.style.display = 'block';
+        warning.innerText = `ℹ️ ${message}`;
+        document.getElementById('speak-btn').style.display = 'none';
+        document.getElementById('manual-confirm-btn').style.display = 'block';
+    }
+
+    function manualConfirmWord() {
+        // Handmatige bevestiging (zonder microfoon): telt niet mee als 'in één keer goed'
+        currentWordFailed = true;
+        showPictoFeedback('🌟 Goed zo!', false);
+        triggerRandomAnimation();
+
+        setTimeout(() => {
+            if (currentMode === 3) {
+                if (currentIndex < wordList.length - 1) {
+                    nextWord();
+                } else {
+                    showCompletionView();
+                }
+            }
+        }, 500);
     }
 
     function isFuzzyMatch(spoken, target) {
@@ -845,6 +1064,16 @@
             speedControl.style.display = 'none';
             currentIndex = 0;
             correctCount = 0;
+
+            // Toon de juiste invoerknop afhankelijk van spraakherkenning-ondersteuning
+            if (speechRecognitionSupported) {
+                document.getElementById('speak-btn').style.display = 'block';
+                document.getElementById('manual-confirm-btn').style.display = 'none';
+                document.getElementById('speech-warning').style.display = 'none';
+            } else {
+                showSpeechFallback("Spraakherkenning wordt niet ondersteund op dit toestel/browser. Je kan ook zonder microfoon oefenen:");
+            }
+
             updateSingleWordUI();
         }
     }
@@ -856,7 +1085,7 @@
             readFullListSequentially();
         } else if (currentMode === 2) {
             const container = document.getElementById('full-list-container');
-            
+
             const oldOverlay = document.getElementById('countdown-overlay');
             if (oldOverlay) oldOverlay.remove();
 
@@ -905,6 +1134,7 @@
             if (badge) badge.classList.add('active-word');
 
             speakText(wordList[index], () => {
+                if (!isPlayingList) return;
                 index++;
                 const speedVal = parseFloat(document.getElementById('speed-slider').value);
                 const pauseBetweenWords = Math.max(350, Math.round(1400 - (speedVal * 1300)));
@@ -922,7 +1152,7 @@
     function stopSpeechAndTimers() {
         isPlayingList = false;
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        
+
         const oldOverlay = document.getElementById('countdown-overlay');
         if (oldOverlay) oldOverlay.remove();
 
@@ -942,7 +1172,7 @@
         showPictoFeedback('', false);
     }
 
-    function showPictoFeedback(msg, isError = false) { 
+    function showPictoFeedback(msg, isError = false) {
         const fb = document.getElementById('picto-feedback');
         fb.innerText = msg;
         if (isError) fb.classList.add('error-msg');
@@ -951,7 +1181,7 @@
 
     function triggerRandomAnimation() {
         const choice = Math.floor(Math.random() * 3);
-        if (choice === 0) confetti({ particleCount: 70, spread: 50, origin: { y: 0.6 } });
+        if (choice === 0) safeConfetti({ particleCount: 70, spread: 50, origin: { y: 0.6 } });
         else showOverlayEmoji(choice === 1 ? '👍' : '🌟');
     }
 
@@ -979,7 +1209,7 @@
 
     function showCompletionView() {
         stopSpeechAndTimers();
-        
+
         const scoreElem = document.getElementById('score-display');
         if (currentMode === 3) {
             scoreElem.style.display = 'block';
@@ -989,18 +1219,23 @@
         }
 
         switchStep('step-finished');
-        confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+        safeConfetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
     }
 
     function switchStep(stepId) {
         document.querySelectorAll('.step-panel').forEach(panel => panel.classList.remove('active'));
         document.getElementById(stepId).classList.add('active');
+        currentStepId = stepId;
     }
 
-    function resetApp() { stopSpeechAndTimers(); location.reload(); }
-
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    function resetApp() {
+        // Vraag bevestiging als er al voortgang is, zodat niemand per ongeluk alles kwijtraakt
+        if (currentStepId !== 'step-upload') {
+            const ok = confirm("Weet je zeker dat je wilt stoppen? Je huidige voortgang gaat verloren.");
+            if (!ok) return;
+        }
+        stopSpeechAndTimers();
+        location.reload();
     }
 </script>
 </body>
